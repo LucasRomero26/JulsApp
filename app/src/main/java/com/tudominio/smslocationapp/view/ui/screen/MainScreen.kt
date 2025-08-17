@@ -38,16 +38,6 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Custom color palette for Juls
-private val PrimaryBlue = Color(0xFF2196F3)
-private val SecondaryBlue = Color(0xFF1976D2)
-private val DarkBlue = Color(0xFF0D47A1)
-private val MediumBlue = Color(0xFF1565C0)
-private val LightBlue = Color(0xFF42A5F5)
-private val AccentGreen = Color(0xFF4CAF50)
-private val AccentRed = Color(0xFFF44336)
-private val BackgroundLight = Color(0xFFF8F9FA)
-
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(
@@ -58,7 +48,7 @@ fun MainScreen(
     // Observar el estado de la aplicación desde el controller
     val appState by controller.appState.collectAsState()
 
-    // Permission management - incluye permisos de ubicación en segundo plano
+    // Permission management
     val permissions = mutableListOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION
@@ -70,12 +60,10 @@ fun MainScreen(
 
     val permissionsState = rememberMultiplePermissionsState(permissions = permissions)
 
-    // Initialize controller
     LaunchedEffect(Unit) {
         controller.checkPermissions()
     }
 
-    // Handle permission changes
     LaunchedEffect(permissionsState.allPermissionsGranted) {
         if (permissionsState.allPermissionsGranted) {
             controller.onPermissionsGranted()
@@ -85,9 +73,8 @@ fun MainScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        // Background gradient circles
         BackgroundDecorations()
 
         Column(
@@ -97,27 +84,19 @@ fun MainScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header
             ModernHeaderSection(controller = controller)
-
             Spacer(modifier = Modifier.height(32.dp))
-
-            // Main control card
             MainControlCard(
                 appState = appState,
                 controller = controller,
                 permissionsState = permissionsState
             )
-
             Spacer(modifier = Modifier.height(24.dp))
-
-            // Status cards
             if (appState.isTrackingEnabled) {
                 LocationStatusCard(appState = appState)
                 Spacer(modifier = Modifier.height(16.dp))
                 ServerStatusCard(appState = appState)
             }
-
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -125,8 +104,9 @@ fun MainScreen(
 
 @Composable
 private fun BackgroundDecorations() {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Top right gradient circle
         Box(
             modifier = Modifier
                 .size(200.dp)
@@ -134,15 +114,13 @@ private fun BackgroundDecorations() {
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            PrimaryBlue.copy(alpha = 0.1f),
+                            primaryColor.copy(alpha = 0.1f),
                             Color.Transparent
                         )
                     ),
                     shape = CircleShape
                 )
         )
-
-        // Bottom left gradient circle
         Box(
             modifier = Modifier
                 .size(150.dp)
@@ -151,7 +129,7 @@ private fun BackgroundDecorations() {
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            LightBlue.copy(alpha = 0.08f),
+                            primaryColor.copy(alpha = 0.08f),
                             Color.Transparent
                         )
                     ),
@@ -169,48 +147,40 @@ private fun ModernHeaderSection(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Theme toggle button in top right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
             ThemeToggleButton(controller = controller)
         }
-
         Spacer(modifier = Modifier.height(24.dp))
-
         Image(
             painter = painterResource(id = R.drawable.location_icon),
             contentDescription = null,
             modifier = Modifier.size(120.dp)
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
         Text(
             text = "Juls",
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 48.sp
             ),
-            color = DarkBlue
+            color = MaterialTheme.colorScheme.primary
         )
-
         Text(
             text = "Just Urgent Location Services",
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp
             ),
-            color = MediumBlue.copy(alpha = 0.8f)
+            color = MaterialTheme.colorScheme.secondary
         )
-
         Spacer(modifier = Modifier.height(8.dp))
-
         Text(
             text = "Automatic GPS tracking to TCP & UDP servers",
             style = MaterialTheme.typography.bodyLarge,
-            color = DarkBlue.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
     }
@@ -223,8 +193,6 @@ private fun ThemeToggleButton(
     val followSystemTheme by controller.themePreferences.followSystemTheme.collectAsState()
     val isDarkTheme by controller.themePreferences.isDarkTheme.collectAsState()
     val systemDarkTheme = isSystemInDarkTheme()
-
-    // Determinar el tema actual
     val currentlyDark = if (followSystemTheme) systemDarkTheme else isDarkTheme
 
     IconButton(
@@ -257,14 +225,13 @@ private fun MainControlCard(
             .fillMaxWidth()
             .shadow(12.dp, RoundedCornerShape(28.dp)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(28.dp)
     ) {
         Column(
             modifier = Modifier.padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Permissions status
             ModernPermissionsStatus(
                 hasLocationPermission = appState.hasLocationPermission,
                 hasBackgroundLocationPermission = appState.hasBackgroundLocationPermission,
@@ -272,17 +239,12 @@ private fun MainControlCard(
                     permissionsState.launchMultiplePermissionRequest()
                 }
             )
-
             Spacer(modifier = Modifier.height(32.dp))
-
-            // Main control button
             MainTrackingButton(
                 isTracking = appState.isTrackingEnabled,
                 canStart = controller.canStartTracking(),
                 onToggleTracking = { controller.toggleTracking() }
             )
-
-            // Status messages
             Spacer(modifier = Modifier.height(24.dp))
             StatusMessages(appState = appState, controller = controller)
         }
@@ -296,15 +258,12 @@ private fun ModernPermissionsStatus(
     onRequestPermissions: () -> Unit
 ) {
     val allPermissionsGranted = hasLocationPermission && hasBackgroundLocationPermission
+    val containerColor = if (allPermissionsGranted) Color(0xFF4CAF50).copy(alpha = 0.1f) else MaterialTheme.colorScheme.errorContainer
+    val contentColor = if (allPermissionsGranted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (allPermissionsGranted)
-                AccentGreen.copy(alpha = 0.1f)
-            else
-                AccentRed.copy(alpha = 0.1f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = RoundedCornerShape(20.dp)
     ) {
         Row(
@@ -315,7 +274,7 @@ private fun ModernPermissionsStatus(
                 modifier = Modifier
                     .size(48.dp)
                     .background(
-                        color = if (allPermissionsGranted) AccentGreen else AccentRed,
+                        color = contentColor,
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -324,21 +283,16 @@ private fun ModernPermissionsStatus(
                     imageVector = if (allPermissionsGranted) Icons.Default.Shield else Icons.Default.Warning,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onError
                 )
             }
-
             Spacer(modifier = Modifier.width(16.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (allPermissionsGranted) "Ready to Track" else "Permissions Required",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = if (allPermissionsGranted) AccentGreen else AccentRed
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = contentColor
                 )
-
                 Text(
                     text = when {
                         allPermissionsGranted -> "All location permissions granted"
@@ -347,19 +301,15 @@ private fun ModernPermissionsStatus(
                         else -> "Location permissions required"
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (allPermissionsGranted)
-                        MediumBlue.copy(alpha = 0.8f)
-                    else
-                        AccentRed.copy(alpha = 0.8f)
+                    color = contentColor.copy(alpha = 0.8f)
                 )
             }
-
             if (!allPermissionsGranted) {
                 Button(
                     onClick = onRequestPermissions,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentRed,
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
                     ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.height(40.dp)
@@ -377,7 +327,7 @@ private fun MainTrackingButton(
     canStart: Boolean,
     onToggleTracking: () -> Unit
 ) {
-    val buttonColor = if (isTracking) AccentRed else AccentGreen
+    val buttonColor = if (isTracking) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
     val buttonText = if (isTracking) "Stop Tracking" else "Start Tracking"
     val buttonIcon = if (isTracking) Icons.Default.Stop else Icons.Default.PlayArrow
 
@@ -390,7 +340,7 @@ private fun MainTrackingButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = buttonColor,
             contentColor = Color.White,
-            disabledContainerColor = MediumBlue.copy(alpha = 0.3f),
+            disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f),
             disabledContentColor = Color.White.copy(alpha = 0.6f)
         ),
         shape = RoundedCornerShape(16.dp)
@@ -403,9 +353,7 @@ private fun MainTrackingButton(
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = buttonText,
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold
-            )
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
         )
     }
 }
@@ -415,7 +363,8 @@ private fun StatusMessages(
     appState: AppState,
     controller: MainController
 ) {
-    // Success message
+    val successColor = Color(0xFF4CAF50)
+
     AnimatedVisibility(
         visible = appState.statusMessage.isNotEmpty(),
         enter = slideInVertically() + fadeIn(),
@@ -423,9 +372,7 @@ private fun StatusMessages(
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = AccentGreen.copy(alpha = 0.1f)
-            ),
+            colors = CardDefaults.cardColors(containerColor = successColor.copy(alpha = 0.1f)),
             shape = RoundedCornerShape(16.dp)
         ) {
             Row(
@@ -435,20 +382,19 @@ private fun StatusMessages(
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
-                    tint = AccentGreen,
+                    tint = successColor,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = appState.statusMessage,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AccentGreen.copy(alpha = 0.9f)
+                    color = successColor.copy(alpha = 0.9f)
                 )
             }
         }
     }
 
-    // Error message
     AnimatedVisibility(
         visible = appState.errorMessage.isNotEmpty(),
         enter = slideInVertically() + fadeIn(),
@@ -456,9 +402,7 @@ private fun StatusMessages(
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = AccentRed.copy(alpha = 0.1f)
-            ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
             shape = RoundedCornerShape(16.dp)
         ) {
             Row(
@@ -468,14 +412,14 @@ private fun StatusMessages(
                 Icon(
                     imageVector = Icons.Default.Error,
                     contentDescription = null,
-                    tint = AccentRed,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = appState.errorMessage,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AccentRed.copy(alpha = 0.9f)
+                    color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
         }
@@ -488,19 +432,14 @@ private fun LocationStatusCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = PrimaryBlue.copy(alpha = 0.1f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
         shape = RoundedCornerShape(20.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp)
-        ) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Animated tracking indicator
                 val infiniteTransition = rememberInfiniteTransition(label = "tracking")
                 val alpha by infiniteTransition.animateFloat(
                     initialValue = 0.3f,
@@ -511,12 +450,13 @@ private fun LocationStatusCard(
                     ),
                     label = "alpha"
                 )
+                val successColor = Color(0xFF4CAF50)
 
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .background(
-                            color = AccentGreen.copy(alpha = alpha),
+                            color = successColor.copy(alpha = alpha),
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -528,26 +468,20 @@ private fun LocationStatusCard(
                         tint = Color.White
                     )
                 }
-
                 Spacer(modifier = Modifier.width(16.dp))
-
                 Column {
                     Text(
                         text = "GPS Tracking Active",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = DarkBlue
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "Sending location every 2 seconds",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MediumBlue.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }
-
-            // Current location display
             appState.currentLocation?.let { location ->
                 LocationDisplaySection(location)
             }
@@ -558,7 +492,7 @@ private fun LocationStatusCard(
 @Composable
 private fun LocationDisplaySection(location: LocationData) {
     Spacer(modifier = Modifier.height(16.dp))
-    HorizontalDivider(color = MediumBlue.copy(alpha = 0.3f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
     Spacer(modifier = Modifier.height(16.dp))
 
     Row(
@@ -569,28 +503,24 @@ private fun LocationDisplaySection(location: LocationData) {
             Text(
                 text = "Latitude",
                 style = MaterialTheme.typography.bodySmall,
-                color = MediumBlue.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
             )
             Text(
                 text = String.format("%.6f", location.latitude),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Medium
-                ),
-                color = DarkBlue
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.primary
             )
         }
         Column {
             Text(
                 text = "Longitude",
                 style = MaterialTheme.typography.bodySmall,
-                color = MediumBlue.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
             )
             Text(
                 text = String.format("%.6f", location.longitude),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Medium
-                ),
-                color = DarkBlue
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -600,7 +530,7 @@ private fun LocationDisplaySection(location: LocationData) {
     Text(
         text = "Last Update: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(location.timestamp))}",
         style = MaterialTheme.typography.bodySmall,
-        color = MediumBlue.copy(alpha = 0.7f)
+        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
     )
 }
 
@@ -610,22 +540,16 @@ private fun ServerStatusCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = SecondaryBlue.copy(alpha = 0.1f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
         shape = RoundedCornerShape(20.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .background(
-                            color = SecondaryBlue,
+                            color = MaterialTheme.colorScheme.secondary,
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -634,40 +558,30 @@ private fun ServerStatusCard(
                         imageVector = Icons.Default.Cloud,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSecondary
                     )
                 }
-
                 Spacer(modifier = Modifier.width(16.dp))
-
                 Column {
                     Text(
                         text = "Server Status",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = DarkBlue
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "TCP & UDP transmission status",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MediumBlue.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }
-
             Spacer(modifier = Modifier.height(20.dp))
-
-            // Server connection indicators
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ServerConnectionRow(
                     serverName = "Server 1",
                     tcpStatus = appState.serverStatus.server1TCP,
                     udpStatus = appState.serverStatus.server1UDP
                 )
-
                 ServerConnectionRow(
                     serverName = "Server 2",
                     tcpStatus = appState.serverStatus.server2TCP,
@@ -691,16 +605,11 @@ private fun ServerConnectionRow(
     ) {
         Text(
             text = serverName,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Medium
-            ),
-            color = DarkBlue,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f)
         )
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ConnectionIndicator(
                 label = "TCP",
                 isConnected = tcpStatus == com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.CONNECTED
@@ -718,6 +627,9 @@ private fun ConnectionIndicator(
     label: String,
     isConnected: Boolean
 ) {
+    val successColor = Color(0xFF4CAF50)
+    val errorColor = MaterialTheme.colorScheme.error
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -726,14 +638,14 @@ private fun ConnectionIndicator(
             modifier = Modifier
                 .size(8.dp)
                 .background(
-                    color = if (isConnected) AccentGreen else AccentRed,
+                    color = if (isConnected) successColor else errorColor,
                     shape = CircleShape
                 )
         )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = if (isConnected) AccentGreen else AccentRed
+            color = if (isConnected) successColor else errorColor
         )
     }
 }
