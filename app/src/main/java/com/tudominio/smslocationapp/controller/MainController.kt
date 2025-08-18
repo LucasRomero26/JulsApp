@@ -84,11 +84,18 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Alternar tema oscuro/claro
+     * Alternar tema oscuro/claro - CORREGIDO
      */
     fun toggleTheme() {
-        themePreferences.toggleDarkTheme()
-        Log.d(TAG, "Theme toggled to: ${if (themePreferences.isDarkTheme.value) "Dark" else "Light"}")
+        // Obtener el estado actual del sistema para tomar la decisión correcta
+        val currentSystemDarkTheme = (context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        themePreferences.toggleThemeMode(currentSystemDarkTheme)
+
+        val newState = themePreferences.getCurrentThemeState()
+        Log.d(TAG, "Theme toggled to: $newState")
     }
 
     /**

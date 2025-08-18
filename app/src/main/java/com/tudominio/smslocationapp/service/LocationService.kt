@@ -213,10 +213,10 @@ class LocationService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Juls - Location Tracking")
             .setContentText(contentText)
-            .setSmallIcon(R.drawable.location_icon)
+            .setSmallIcon(R.drawable.logo_light) // Usar el logo claro existente
             .setContentIntent(pendingIntent)
             .addAction(
-                R.drawable.location_icon,
+                android.R.drawable.ic_menu_close_clear_cancel,
                 "Stop",
                 stopPendingIntent
             )
@@ -239,7 +239,7 @@ class LocationService : Service() {
         val errorNotification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Juls - Service Error")
             .setContentText("Location tracking stopped due to error")
-            .setSmallIcon(R.drawable.location_icon)
+            .setSmallIcon(R.drawable.logo_light) // Usar el logo claro existente
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()

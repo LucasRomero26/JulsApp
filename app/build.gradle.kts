@@ -80,8 +80,8 @@ dependencies {
     // Location Services - Para GPS
     implementation("com.google.android.gms:play-services-location:21.1.0")
 
-    // Permissions - Para manejo moderno de permisos
-    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+    // Permissions - Para manejo moderno de permisos (ACTUALIZADO)
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
     // Coroutines para tareas asíncronas
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
@@ -89,6 +89,10 @@ dependencies {
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+
+    // Para manejo mejorado de permisos
+    implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

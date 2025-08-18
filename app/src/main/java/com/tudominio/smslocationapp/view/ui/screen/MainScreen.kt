@@ -1,7 +1,10 @@
 package com.tudominio.smslocation.view.ui.screen
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -12,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,9 +36,11 @@ import com.tudominio.smslocation.R
 import com.tudominio.smslocation.controller.MainController
 import com.tudominio.smslocation.model.data.AppState
 import com.tudominio.smslocation.model.data.LocationData
+import com.tudominio.smslocation.view.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.MultiplePermissionsState
+import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -48,25 +54,39 @@ fun MainScreen(
     // Observar el estado de la aplicación desde el controller
     val appState by controller.appState.collectAsState()
 
-    // Permission management
-    val permissions = mutableListOf(
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION
+    // Permisos de ubicación básicos
+    val locationPermissions = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
     )
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        permissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    // Permiso de ubicación en segundo plano (separado para Android 10+)
+    val backgroundLocationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        rememberPermissionState(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    } else {
+        null
     }
 
-    val permissionsState = rememberMultiplePermissionsState(permissions = permissions)
-
+    // Verificar permisos al inicio
     LaunchedEffect(Unit) {
         controller.checkPermissions()
     }
 
-    LaunchedEffect(permissionsState.allPermissionsGranted) {
-        if (permissionsState.allPermissionsGranted) {
+    // Observar cambios en permisos básicos
+    LaunchedEffect(locationPermissions.allPermissionsGranted) {
+        if (locationPermissions.allPermissionsGranted) {
             controller.onPermissionsGranted()
+        }
+    }
+
+    // Observar cambios en permiso de segundo plano
+    LaunchedEffect(backgroundLocationPermission?.status) {
+        backgroundLocationPermission?.let {
+            if (it.status == PermissionStatus.Granted) {
+                controller.onPermissionsGranted()
+            }
         }
     }
 
@@ -77,11 +97,14 @@ fun MainScreen(
     ) {
         BackgroundDecorations()
 
+        // Header superior con Welcome y botón de tema
+        TopHeader(controller = controller)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                .padding(top = 100.dp, start = 20.dp, end = 20.dp, bottom = 20.dp), // Agregamos padding top para el header
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             ModernHeaderSection(controller = controller)
@@ -89,7 +112,8 @@ fun MainScreen(
             MainControlCard(
                 appState = appState,
                 controller = controller,
-                permissionsState = permissionsState
+                locationPermissions = locationPermissions,
+                backgroundLocationPermission = backgroundLocationPermission
             )
             Spacer(modifier = Modifier.height(24.dp))
             if (appState.isTrackingEnabled) {
@@ -98,6 +122,63 @@ fun MainScreen(
                 ServerStatusCard(appState = appState)
             }
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun TopHeader(
+    controller: MainController
+) {
+    // Determinar el tema actual
+    val followSystemTheme by controller.themePreferences.followSystemTheme.collectAsState()
+    val isDarkTheme by controller.themePreferences.isDarkTheme.collectAsState()
+    val systemDarkTheme = isSystemInDarkTheme()
+    val currentlyDark = if (followSystemTheme) systemDarkTheme else isDarkTheme
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 60.dp, start = 20.dp, end = 20.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Texto "Welcome" en la esquina superior izquierda
+        Text(
+            text = "Welcome",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Medium,
+                fontSize = 30.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        // Botón de tema en la esquina superior derecha
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = CircleShape
+                )
+                .clickable { controller.toggleTheme() },
+            contentAlignment = Alignment.Center
+        ) {
+            AnimatedContent(
+                targetState = currentlyDark,
+                transitionSpec = {
+                    (scaleIn(animationSpec = tween(300)) + fadeIn()) togetherWith
+                            (scaleOut(animationSpec = tween(300)) + fadeOut())
+                },
+                label = "theme_icon_transition"
+            ) { isDark ->
+                Icon(
+                    imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
+                    contentDescription = "Toggle theme",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
@@ -114,7 +195,7 @@ private fun BackgroundDecorations() {
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            primaryColor.copy(alpha = 0.1f),
+                            primaryColor.copy(alpha = 0.08f),
                             Color.Transparent
                         )
                     ),
@@ -129,7 +210,7 @@ private fun BackgroundDecorations() {
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            primaryColor.copy(alpha = 0.08f),
+                            primaryColor.copy(alpha = 0.06f),
                             Color.Transparent
                         )
                     ),
@@ -143,30 +224,49 @@ private fun BackgroundDecorations() {
 private fun ModernHeaderSection(
     controller: MainController
 ) {
+    // Determinar el tema actual
+    val followSystemTheme by controller.themePreferences.followSystemTheme.collectAsState()
+    val isDarkTheme by controller.themePreferences.isDarkTheme.collectAsState()
+    val systemDarkTheme = isSystemInDarkTheme()
+    val currentlyDark = if (followSystemTheme) systemDarkTheme else isDarkTheme
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            ThemeToggleButton(controller = controller)
+        // Logo dinámico según el tema
+        AnimatedContent(
+            targetState = currentlyDark,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(300)) togetherWith
+                        fadeOut(animationSpec = tween(300))
+            },
+            label = "logo_transition"
+        ) { isDark ->
+            Image(
+                painter = painterResource(
+                    id = if (isDark) R.drawable.logo_dark else R.drawable.logo_light
+                ),
+                contentDescription = "Juls Logo",
+                modifier = Modifier
+                    .size(200.dp)
+                    .animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
+            )
         }
-        Spacer(modifier = Modifier.height(24.dp))
-        Image(
-            painter = painterResource(id = R.drawable.location_icon),
-            contentDescription = null,
-            modifier = Modifier.size(120.dp)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
+
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
             text = "Juls",
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 48.sp
             ),
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.secondary
         )
         Text(
             text = "Just Urgent Location Services",
@@ -174,41 +274,7 @@ private fun ModernHeaderSection(
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp
             ),
-            color = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Automatic GPS tracking to TCP & UDP servers",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-private fun ThemeToggleButton(
-    controller: MainController
-) {
-    val followSystemTheme by controller.themePreferences.followSystemTheme.collectAsState()
-    val isDarkTheme by controller.themePreferences.isDarkTheme.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val currentlyDark = if (followSystemTheme) systemDarkTheme else isDarkTheme
-
-    IconButton(
-        onClick = { controller.toggleTheme() },
-        modifier = Modifier
-            .size(48.dp)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                shape = CircleShape
-            )
-    ) {
-        Icon(
-            imageVector = if (currentlyDark) Icons.Default.LightMode else Icons.Default.DarkMode,
-            contentDescription = if (currentlyDark) "Switch to Light Mode" else "Switch to Dark Mode",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -218,7 +284,8 @@ private fun ThemeToggleButton(
 private fun MainControlCard(
     appState: AppState,
     controller: MainController,
-    permissionsState: MultiplePermissionsState
+    locationPermissions: com.google.accompanist.permissions.MultiplePermissionsState,
+    backgroundLocationPermission: com.google.accompanist.permissions.PermissionState?
 ) {
     Card(
         modifier = Modifier
@@ -235,9 +302,8 @@ private fun MainControlCard(
             ModernPermissionsStatus(
                 hasLocationPermission = appState.hasLocationPermission,
                 hasBackgroundLocationPermission = appState.hasBackgroundLocationPermission,
-                onRequestPermissions = {
-                    permissionsState.launchMultiplePermissionRequest()
-                }
+                locationPermissions = locationPermissions,
+                backgroundLocationPermission = backgroundLocationPermission
             )
             Spacer(modifier = Modifier.height(32.dp))
             MainTrackingButton(
@@ -251,70 +317,178 @@ private fun MainControlCard(
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun ModernPermissionsStatus(
     hasLocationPermission: Boolean,
     hasBackgroundLocationPermission: Boolean,
-    onRequestPermissions: () -> Unit
+    locationPermissions: com.google.accompanist.permissions.MultiplePermissionsState,
+    backgroundLocationPermission: com.google.accompanist.permissions.PermissionState?
 ) {
+    val context = LocalContext.current
     val allPermissionsGranted = hasLocationPermission && hasBackgroundLocationPermission
-    val containerColor = if (allPermissionsGranted) Color(0xFF4CAF50).copy(alpha = 0.1f) else MaterialTheme.colorScheme.errorContainer
-    val contentColor = if (allPermissionsGranted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+
+    // Usar colores de la nueva paleta
+    val successColor = LightBlueGray // #8097A6 en lugar del verde
+    val containerColor = if (allPermissionsGranted)
+        successColor.copy(alpha = 0.1f)
+    else
+        MaterialTheme.colorScheme.errorContainer
+    val contentColor = if (allPermissionsGranted)
+        successColor
+    else
+        MaterialTheme.colorScheme.error
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = RoundedCornerShape(20.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = contentColor,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (allPermissionsGranted) Icons.Default.Shield else Icons.Default.Warning,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onError
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (allPermissionsGranted) "Ready to Track" else "Permissions Required",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = contentColor
-                )
-                Text(
-                    text = when {
-                        allPermissionsGranted -> "All location permissions granted"
-                        !hasLocationPermission -> "Basic location access needed"
-                        !hasBackgroundLocationPermission -> "Background location access needed"
-                        else -> "Location permissions required"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.8f)
-                )
-            }
-            if (!allPermissionsGranted) {
-                Button(
-                    onClick = onRequestPermissions,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(40.dp)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = contentColor,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Grant", fontWeight = FontWeight.Medium)
+                    Icon(
+                        imageVector = if (allPermissionsGranted) Icons.Default.Shield else Icons.Default.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (allPermissionsGranted) Lightest else MaterialTheme.colorScheme.onError
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (allPermissionsGranted) "Ready to Track" else "Permissions Required",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = contentColor
+                    )
+                    Text(
+                        text = when {
+                            allPermissionsGranted -> "All location permissions granted"
+                            !hasLocationPermission -> "Basic location access needed"
+                            !hasBackgroundLocationPermission -> "Background location access needed"
+                            else -> "Location permissions required"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = contentColor.copy(alpha = 0.8f)
+                    )
+                }
+            }
+
+            // Mostrar botones de permisos si es necesario
+            if (!allPermissionsGranted) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Botón para permisos básicos de ubicación
+                if (!hasLocationPermission) {
+                    Button(
+                        onClick = {
+                            locationPermissions.launchMultiplePermissionRequest()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Grant Location Access", fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                // Botón para permiso de ubicación en segundo plano
+                if (hasLocationPermission && !hasBackgroundLocationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    if (!hasLocationPermission) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Button(
+                        onClick = {
+                            if (backgroundLocationPermission?.status is PermissionStatus.Denied &&
+                                (backgroundLocationPermission.status as PermissionStatus.Denied).shouldShowRationale) {
+                                // Si debe mostrar explicación, ir a configuración
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
+                                context.startActivity(intent)
+                            } else {
+                                // Solicitar permiso normalmente
+                                backgroundLocationPermission?.launchPermissionRequest()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LightBlueGray, // Usar color de la paleta
+                            contentColor = Lightest
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (backgroundLocationPermission?.status is PermissionStatus.Denied &&
+                                (backgroundLocationPermission.status as PermissionStatus.Denied).shouldShowRationale) {
+                                "Open Settings"
+                            } else {
+                                "Grant Background Access"
+                            },
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Información adicional para permiso de segundo plano
+                if (hasLocationPermission && !hasBackgroundLocationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Background Location Required",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "For continuous GPS tracking, please select \"Allow all the time\" in the next screen.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -327,7 +501,8 @@ private fun MainTrackingButton(
     canStart: Boolean,
     onToggleTracking: () -> Unit
 ) {
-    val buttonColor = if (isTracking) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+    // Usar colores de la nueva paleta
+    val buttonColor = if (isTracking) MaterialTheme.colorScheme.error else LightBlueGray // #8097A6
     val buttonText = if (isTracking) "Stop Tracking" else "Start Tracking"
     val buttonIcon = if (isTracking) Icons.Default.Stop else Icons.Default.PlayArrow
 
@@ -339,9 +514,9 @@ private fun MainTrackingButton(
             .height(64.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = buttonColor,
-            contentColor = Color.White,
-            disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f),
-            disabledContentColor = Color.White.copy(alpha = 0.6f)
+            contentColor = Lightest, // #F2F2F2
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -363,7 +538,7 @@ private fun StatusMessages(
     appState: AppState,
     controller: MainController
 ) {
-    val successColor = Color(0xFF4CAF50)
+    val successColor = LightBlueGray // #8097A6 en lugar del verde
 
     AnimatedVisibility(
         visible = appState.statusMessage.isNotEmpty(),
@@ -432,7 +607,7 @@ private fun LocationStatusCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
@@ -450,7 +625,7 @@ private fun LocationStatusCard(
                     ),
                     label = "alpha"
                 )
-                val successColor = Color(0xFF4CAF50)
+                val successColor = LightBlueGray // #8097A6
 
                 Box(
                     modifier = Modifier
@@ -465,7 +640,7 @@ private fun LocationStatusCard(
                         imageVector = Icons.Default.MyLocation,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = Color.White
+                        tint = Lightest // #F2F2F2
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
@@ -473,12 +648,12 @@ private fun LocationStatusCard(
                     Text(
                         text = "GPS Tracking Active",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
                         text = "Sending location every 2 seconds",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -492,7 +667,7 @@ private fun LocationStatusCard(
 @Composable
 private fun LocationDisplaySection(location: LocationData) {
     Spacer(modifier = Modifier.height(16.dp))
-    HorizontalDivider(color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     Spacer(modifier = Modifier.height(16.dp))
 
     Row(
@@ -503,24 +678,24 @@ private fun LocationDisplaySection(location: LocationData) {
             Text(
                 text = "Latitude",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
             Text(
                 text = String.format("%.6f", location.latitude),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
         Column {
             Text(
                 text = "Longitude",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
             Text(
                 text = String.format("%.6f", location.longitude),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
     }
@@ -530,7 +705,7 @@ private fun LocationDisplaySection(location: LocationData) {
     Text(
         text = "Last Update: ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(location.timestamp))}",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
     )
 }
 
@@ -540,7 +715,7 @@ private fun ServerStatusCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
@@ -566,12 +741,12 @@ private fun ServerStatusCard(
                     Text(
                         text = "Server Status",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Text(
                         text = "TCP & UDP transmission status",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -606,7 +781,7 @@ private fun ServerConnectionRow(
         Text(
             text = serverName,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.weight(1f)
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -627,7 +802,7 @@ private fun ConnectionIndicator(
     label: String,
     isConnected: Boolean
 ) {
-    val successColor = Color(0xFF4CAF50)
+    val successColor = LightBlueGray // #8097A6
     val errorColor = MaterialTheme.colorScheme.error
 
     Row(

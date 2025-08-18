@@ -255,15 +255,12 @@ class NetworkManager(private val context: Context) {
 
     /**
      * Enviar datos de prueba a todos los servidores
+     * CORREGIDO: Usar el método createTestLocation que incluye systemTimestamp
      */
     suspend fun sendTestData(): ServerStatus {
-        val testLocation = LocationData(
-            latitude = 4.123456,
-            longitude = -74.123456,
-            timestamp = System.currentTimeMillis(),
-            accuracy = 5.0f,
-            altitude = 2640.0,
-            speed = 0.0f
+        val testLocation = LocationData.createTestLocation(
+            lat = 4.123456,
+            lon = -74.123456
         )
 
         Log.d(TAG, "Sending test JSON data to all servers: ${testLocation.toJsonFormat()}")

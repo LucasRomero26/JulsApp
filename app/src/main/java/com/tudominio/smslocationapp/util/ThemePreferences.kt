@@ -65,10 +65,32 @@ class ThemePreferences(context: Context) {
     }
 
     /**
-     * Alternar tema oscuro
+     * Alternar tema oscuro - CORREGIDO
      */
     fun toggleDarkTheme() {
-        setDarkTheme(!_isDarkTheme.value)
+        val currentlyFollowingSystem = _followSystemTheme.value
+
+        if (currentlyFollowingSystem) {
+            // Si estamos siguiendo el sistema, cambiar a modo manual con tema opuesto al actual
+            val currentEffectiveTheme = _isDarkTheme.value // Este debería reflejar el tema actual del sistema
+            setDarkTheme(!currentEffectiveTheme)
+        } else {
+            // Si ya estamos en modo manual, simplemente alternar
+            setDarkTheme(!_isDarkTheme.value)
+        }
+    }
+
+    /**
+     * Alternar entre seguir sistema y modo manual - NUEVO MÉTODO
+     */
+    fun toggleThemeMode(currentSystemDarkTheme: Boolean) {
+        if (_followSystemTheme.value) {
+            // Cambiar de seguir sistema a modo manual con el tema opuesto al sistema actual
+            setDarkTheme(!currentSystemDarkTheme)
+        } else {
+            // Cambiar de modo manual a seguir sistema
+            setFollowSystemTheme(true)
+        }
     }
 
     /**
@@ -79,6 +101,17 @@ class ThemePreferences(context: Context) {
             _followSystemTheme.value -> ThemeState.SYSTEM
             _isDarkTheme.value -> ThemeState.DARK
             else -> ThemeState.LIGHT
+        }
+    }
+
+    /**
+     * Verificar si el tema actual es oscuro (considerando sistema)
+     */
+    fun isCurrentlyDark(systemDarkTheme: Boolean): Boolean {
+        return if (_followSystemTheme.value) {
+            systemDarkTheme
+        } else {
+            _isDarkTheme.value
         }
     }
 
