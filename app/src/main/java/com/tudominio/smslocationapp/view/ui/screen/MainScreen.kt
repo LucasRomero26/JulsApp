@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,12 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,6 +36,7 @@ import com.tudominio.smslocation.controller.MainController
 import com.tudominio.smslocation.model.data.AppState
 import com.tudominio.smslocation.model.data.LocationData
 import com.tudominio.smslocation.view.ui.theme.*
+import com.tudominio.smslocation.util.ThemeState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -90,94 +90,43 @@ fun MainScreen(
         }
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        BackgroundDecorations()
+        // Background decorations como primer elemento
+        Box(modifier = Modifier.fillMaxSize()) {
+            BackgroundDecorations()
 
-        // Header superior con Welcome y botón de tema
-        TopHeader(controller = controller)
+            Column {
+                // Header superior con Welcome y toggle de tema
+                TopHeader(controller = controller)
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(top = 100.dp, start = 20.dp, end = 20.dp, bottom = 20.dp), // Agregamos padding top para el header
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            ModernHeaderSection(controller = controller)
-            Spacer(modifier = Modifier.height(32.dp))
-            MainControlCard(
-                appState = appState,
-                controller = controller,
-                locationPermissions = locationPermissions,
-                backgroundLocationPermission = backgroundLocationPermission
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            if (appState.isTrackingEnabled) {
-                LocationStatusCard(appState = appState)
-                Spacer(modifier = Modifier.height(16.dp))
-                ServerStatusCard(appState = appState)
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
-}
-
-@Composable
-private fun TopHeader(
-    controller: MainController
-) {
-    // Determinar el tema actual
-    val followSystemTheme by controller.themePreferences.followSystemTheme.collectAsState()
-    val isDarkTheme by controller.themePreferences.isDarkTheme.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val currentlyDark = if (followSystemTheme) systemDarkTheme else isDarkTheme
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 60.dp, start = 20.dp, end = 20.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Texto "Welcome" en la esquina superior izquierda
-        Text(
-            text = "Welcome",
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Medium,
-                fontSize = 30.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        // Botón de tema en la esquina superior derecha
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = CircleShape
-                )
-                .clickable { controller.toggleTheme() },
-            contentAlignment = Alignment.Center
-        ) {
-            AnimatedContent(
-                targetState = currentlyDark,
-                transitionSpec = {
-                    (scaleIn(animationSpec = tween(300)) + fadeIn()) togetherWith
-                            (scaleOut(animationSpec = tween(300)) + fadeOut())
-                },
-                label = "theme_icon_transition"
-            ) { isDark ->
-                Icon(
-                    imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
-                    contentDescription = "Toggle theme",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
+                // Contenido principal con scroll
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ModernHeaderSection(controller = controller)
+                    Spacer(modifier = Modifier.height(32.dp))
+                    MainControlCard(
+                        appState = appState,
+                        controller = controller,
+                        locationPermissions = locationPermissions,
+                        backgroundLocationPermission = backgroundLocationPermission
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    if (appState.isTrackingEnabled) {
+                        LocationStatusCard(appState = appState)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        ServerStatusCard(appState = appState)
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
     }
@@ -221,43 +170,134 @@ private fun BackgroundDecorations() {
 }
 
 @Composable
+private fun TopHeader(
+    controller: MainController
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                top = 80.dp,
+                start = 20.dp,
+                end = 20.dp,
+                bottom = 16.dp
+            ),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Texto "Welcome"
+        Text(
+            text = "Welcome",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Medium,
+                fontSize = 30.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        // Botón de tema premium con efectos
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .shadow(
+                    elevation = if (ThemeState.isDarkTheme) 8.dp else 4.dp,
+                    shape = CircleShape,
+                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                )
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = if (ThemeState.isDarkTheme) {
+                            listOf(
+                                MaterialTheme.colorScheme.surface,
+                                MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        } else {
+                            listOf(
+                                MaterialTheme.colorScheme.surface,
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+                            )
+                        }
+                    ),
+                    shape = CircleShape
+                )
+                .clickable {
+                    ThemeState.toggleTheme()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            // Círculo interno con gradiente
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = if (ThemeState.isDarkTheme) {
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFF6C7B95), // Azul grisáceo oscuro
+                                    Color(0xFF4A5568)  // Gris azulado más oscuro
+                                )
+                            )
+                        } else {
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFFFFFFFF), // Amarillo muy claro
+                                    Color(0xFFFFFFFF)  // Amarillo pálido
+                                )
+                            )
+                        },
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                // Ícono con transición suave y colores temáticos
+                AnimatedContent(
+                    targetState = ThemeState.isDarkTheme,
+                    transitionSpec = {
+                        (scaleIn(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        ) + fadeIn(animationSpec = tween(400))) togetherWith
+                                (scaleOut(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200)))
+                    },
+                    label = "theme_icon_transition"
+                ) { isDark ->
+                    Icon(
+                        imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
+                        contentDescription = if (isDark) "Switch to light mode" else "Switch to dark mode",
+                        tint = if (isDark) {
+                            Color(0xFFF7FAFC) // Blanco con tinte azul claro
+                        } else {
+                            Color(0xFF4A5568) // Amarillo dorado para el sol
+                        },
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ModernHeaderSection(
     controller: MainController
 ) {
-    // Determinar el tema actual
-    val followSystemTheme by controller.themePreferences.followSystemTheme.collectAsState()
-    val isDarkTheme by controller.themePreferences.isDarkTheme.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val currentlyDark = if (followSystemTheme) systemDarkTheme else isDarkTheme
-
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Logo dinámico según el tema
-        AnimatedContent(
-            targetState = currentlyDark,
-            transitionSpec = {
-                fadeIn(animationSpec = tween(300)) togetherWith
-                        fadeOut(animationSpec = tween(300))
-            },
-            label = "logo_transition"
-        ) { isDark ->
-            Image(
-                painter = painterResource(
-                    id = if (isDark) R.drawable.logo_dark else R.drawable.logo_light
-                ),
-                contentDescription = "Juls Logo",
-                modifier = Modifier
-                    .size(200.dp)
-                    .animateContentSize(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    )
-            )
-        }
+        // Logo según el tema usando ThemeState directamente
+        Image(
+            painter = painterResource(
+                id = if (ThemeState.isDarkTheme) R.drawable.logo_dark else R.drawable.logo_light
+            ),
+            contentDescription = "Juls Logo",
+            modifier = Modifier.size(200.dp)
+        )
 
         Spacer(modifier = Modifier.height(5.dp))
         Text(
@@ -328,8 +368,7 @@ private fun ModernPermissionsStatus(
     val context = LocalContext.current
     val allPermissionsGranted = hasLocationPermission && hasBackgroundLocationPermission
 
-    // Usar colores de la nueva paleta
-    val successColor = LightBlueGray // #8097A6 en lugar del verde
+    val successColor = LightBlueGray
     val containerColor = if (allPermissionsGranted)
         successColor.copy(alpha = 0.1f)
     else
@@ -384,11 +423,9 @@ private fun ModernPermissionsStatus(
                 }
             }
 
-            // Mostrar botones de permisos si es necesario
             if (!allPermissionsGranted) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Botón para permisos básicos de ubicación
                 if (!hasLocationPermission) {
                     Button(
                         onClick = {
@@ -411,7 +448,6 @@ private fun ModernPermissionsStatus(
                     }
                 }
 
-                // Botón para permiso de ubicación en segundo plano
                 if (hasLocationPermission && !hasBackgroundLocationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     if (!hasLocationPermission) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -421,18 +457,16 @@ private fun ModernPermissionsStatus(
                         onClick = {
                             if (backgroundLocationPermission?.status is PermissionStatus.Denied &&
                                 (backgroundLocationPermission.status as PermissionStatus.Denied).shouldShowRationale) {
-                                // Si debe mostrar explicación, ir a configuración
                                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                     data = Uri.fromParts("package", context.packageName, null)
                                 }
                                 context.startActivity(intent)
                             } else {
-                                // Solicitar permiso normalmente
                                 backgroundLocationPermission?.launchPermissionRequest()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = LightBlueGray, // Usar color de la paleta
+                            containerColor = LightBlueGray,
                             contentColor = Lightest
                         ),
                         shape = RoundedCornerShape(12.dp),
@@ -456,7 +490,6 @@ private fun ModernPermissionsStatus(
                     }
                 }
 
-                // Información adicional para permiso de segundo plano
                 if (hasLocationPermission && !hasBackgroundLocationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Card(
@@ -501,8 +534,7 @@ private fun MainTrackingButton(
     canStart: Boolean,
     onToggleTracking: () -> Unit
 ) {
-    // Usar colores de la nueva paleta
-    val buttonColor = if (isTracking) MaterialTheme.colorScheme.error else LightBlueGray // #8097A6
+    val buttonColor = if (isTracking) MaterialTheme.colorScheme.error else LightBlueGray
     val buttonText = if (isTracking) "Stop Tracking" else "Start Tracking"
     val buttonIcon = if (isTracking) Icons.Default.Stop else Icons.Default.PlayArrow
 
@@ -514,7 +546,7 @@ private fun MainTrackingButton(
             .height(64.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = buttonColor,
-            contentColor = Lightest, // #F2F2F2
+            contentColor = Lightest,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         ),
@@ -538,7 +570,7 @@ private fun StatusMessages(
     appState: AppState,
     controller: MainController
 ) {
-    val successColor = LightBlueGray // #8097A6 en lugar del verde
+    val successColor = LightBlueGray
 
     AnimatedVisibility(
         visible = appState.statusMessage.isNotEmpty(),
@@ -625,7 +657,7 @@ private fun LocationStatusCard(
                     ),
                     label = "alpha"
                 )
-                val successColor = LightBlueGray // #8097A6
+                val successColor = LightBlueGray
 
                 Box(
                     modifier = Modifier
@@ -640,7 +672,7 @@ private fun LocationStatusCard(
                         imageVector = Icons.Default.MyLocation,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = Lightest // #F2F2F2
+                        tint = Lightest
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
@@ -802,7 +834,7 @@ private fun ConnectionIndicator(
     label: String,
     isConnected: Boolean
 ) {
-    val successColor = LightBlueGray // #8097A6
+    val successColor = LightBlueGray
     val errorColor = MaterialTheme.colorScheme.error
 
     Row(

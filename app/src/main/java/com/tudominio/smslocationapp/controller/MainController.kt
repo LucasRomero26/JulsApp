@@ -86,33 +86,15 @@ class MainController(private val context: Context) : ViewModel() {
     /**
      * Alternar tema oscuro/claro - CORREGIDO
      */
-    fun toggleTheme() {
-        // Obtener el estado actual del sistema para tomar la decisión correcta
-        val currentSystemDarkTheme = (context.resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
 
-        themePreferences.toggleThemeMode(currentSystemDarkTheme)
-
-        val newState = themePreferences.getCurrentThemeState()
-        Log.d(TAG, "Theme toggled to: $newState")
-    }
 
     /**
      * Establecer tema específico
      */
-    fun setTheme(isDark: Boolean) {
-        themePreferences.setDarkTheme(isDark)
-        Log.d(TAG, "Theme set to: ${if (isDark) "Dark" else "Light"}")
-    }
 
     /**
      * Establecer seguimiento del tema del sistema
      */
-    fun setFollowSystemTheme(follow: Boolean) {
-        themePreferences.setFollowSystemTheme(follow)
-        Log.d(TAG, "Follow system theme: $follow")
-    }
 
     /**
      * Iniciar tracking de ubicación
@@ -280,12 +262,12 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Obtener información de diagnóstico
+     * Obtener información de diagnóstico - CORREGIDO
      */
     fun getDiagnosticInfo(): Map<String, String> {
         return locationController.getDiagnosticInfo() + mapOf(
-            "current_theme" to themePreferences.getCurrentThemeState().name,
-            "follow_system_theme" to themePreferences.followSystemTheme.value.toString()
+            "app_version" to "1.0.0"
+            // ELIMINAR cualquier referencia a themePreferences
         )
     }
 
@@ -403,8 +385,8 @@ class MainController(private val context: Context) : ViewModel() {
             "udp_port" to Constants.UDP_PORT.toString(),
             "update_interval" to "${Constants.LOCATION_UPDATE_INTERVAL}ms",
             "network_timeout" to "${Constants.NETWORK_TIMEOUT}ms",
-            "max_retries" to Constants.MAX_RETRY_ATTEMPTS.toString(),
-            "theme_mode" to themePreferences.getCurrentThemeState().name
+            "max_retries" to Constants.MAX_RETRY_ATTEMPTS.toString()
+            // ELIMINAR la línea del theme_mode
         )
     }
 

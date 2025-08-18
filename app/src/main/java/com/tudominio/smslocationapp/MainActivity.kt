@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import com.tudominio.smslocation.controller.MainController
 import com.tudominio.smslocation.view.ui.screen.MainScreen
 import com.tudominio.smslocation.view.ui.theme.SMSLocationAppTheme
+import com.tudominio.smslocation.util.ThemeState
 
 class MainActivity : ComponentActivity() {
 
@@ -19,17 +20,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Inicializar el estado del tema PRIMERO
+        ThemeState.initialize(this)
+
         // Inicializar controlador principal
         mainController = MainController(this)
 
         enableEdgeToEdge()
         setContent {
-            SMSLocationAppTheme(themePreferences = mainController.themePreferences) {
+            SMSLocationAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Pasar el controller a MainScreen
                     MainScreen(controller = mainController)
                 }
             }
@@ -38,20 +41,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Notificar al controller que la app se reanudó
         mainController.onAppResumed()
     }
 
     override fun onPause() {
         super.onPause()
-        // Notificar al controller que la app se pausó
         mainController.onAppPaused()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        // Limpiar recursos del controller
-        // No llamamos cleanup aquí porque el ViewModel se encarga automáticamente
-        // cuando se destruye
     }
 }

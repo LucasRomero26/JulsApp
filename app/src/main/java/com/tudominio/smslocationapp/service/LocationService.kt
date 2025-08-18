@@ -15,7 +15,6 @@ import com.tudominio.smslocation.R
 import com.tudominio.smslocation.controller.LocationController
 import com.tudominio.smslocation.util.Constants
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
 
 /**
  * Servicio en primer plano para tracking de ubicación
@@ -213,7 +212,7 @@ class LocationService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Juls - Location Tracking")
             .setContentText(contentText)
-            .setSmallIcon(R.drawable.logo_light) // Usar el logo claro existente
+            .setSmallIcon(R.drawable.logo_dark) // Usar el logo claro existente
             .setContentIntent(pendingIntent)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
@@ -239,7 +238,7 @@ class LocationService : Service() {
         val errorNotification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Juls - Service Error")
             .setContentText("Location tracking stopped due to error")
-            .setSmallIcon(R.drawable.logo_light) // Usar el logo claro existente
+            .setSmallIcon(R.drawable.logo_dark) // Usar el logo claro existente
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
