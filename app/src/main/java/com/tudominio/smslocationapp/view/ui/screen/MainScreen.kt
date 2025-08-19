@@ -712,6 +712,8 @@ private fun StatusMessages(
     }
 }
 
+// Solo la función LocationStatusCard actualizada con el nuevo intervalo
+
 /**
  * Composable for displaying the current GPS tracking status and last received location data.
  * Features an animated icon to indicate active tracking.
@@ -769,7 +771,7 @@ private fun LocationStatusCard(
                         color = MaterialTheme.colorScheme.onPrimaryContainer // Text color for primary container.
                     )
                     Text(
-                        text = "Sending location every 2 seconds",
+                        text = "Sending location every 5 seconds", // ACTUALIZADO: 2 segundos -> 5 segundos
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) // Slightly faded text.
                     )

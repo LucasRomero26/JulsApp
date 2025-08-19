@@ -7,18 +7,18 @@ package com.tudominio.smslocation.util
  */
 object Constants {
 
-    // Server Configuration
-    // TODO: Change these to actual IP addresses of Server 1 and Server 2.
-    const val SERVER_IP_1 = "192.168.1.100" // IP address for the first server.
-    const val SERVER_IP_2 = "192.168.1.101" // IP address for the second server.
-    const val TCP_PORT = 6000 // Default TCP port for server communication.
-    const val UDP_PORT = 6001 // Default UDP port for server communication.
+    // Server Configuration - ACTUALIZADO CON IP PÚBLICA
+    // Ambos servidores usan la misma IP pública pero diferentes puertos
+    const val SERVER_IP_1 = "186.119.50.121" // IP pública del servidor principal
+    const val SERVER_IP_2 = "186.119.50.121" // IP pública del servidor secundario (misma IP)
+    const val TCP_PORT = 6000 // Puerto TCP para comunicación confiable
+    const val UDP_PORT = 6001 // Puerto UDP para comunicación rápida
 
     // GPS Location Configuration
     // Interval at which location updates are requested (in milliseconds).
-    const val LOCATION_UPDATE_INTERVAL = 2000L // 2 seconds.
+    const val LOCATION_UPDATE_INTERVAL = 5000L // 5 seconds.
     // Fastest interval at which location updates can be received (in milliseconds).
-    const val LOCATION_FASTEST_INTERVAL = 2000L // 2 seconds.
+    const val LOCATION_FASTEST_INTERVAL = 5000L // 5 seconds.
     // Timeout for obtaining a single location fix (e.g., for getCurrentLocation) in milliseconds.
     const val LOCATION_TIMEOUT = 5000L // 5 seconds.
 

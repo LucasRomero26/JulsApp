@@ -11,9 +11,9 @@ import java.net.SocketTimeoutException
 import java.io.IOException
 
 /**
- * TCP client for sending location data.
+ * TCP client for sending location data as JSON directly (without HTTP headers).
  * This class handles the low-level TCP communication, including connection, data writing,
- * timeouts, and error handling. It also supports sending data with HTTP headers for compatibility.
+ * timeouts, and error handling. Simplified to send raw JSON for better compatibility.
  */
 class TcpClient {
 
@@ -47,7 +47,7 @@ class TcpClient {
         data: String
     ): TcpResult = withContext(Dispatchers.IO) { // Ensure this runs on an IO dispatcher.
 
-        Log.d(TAG, "TCP: Attempting to send to $serverIP:$port - Data: $data")
+        Log.d(TAG, "TCP: Attempting to send JSON to $serverIP:$port - Data: $data")
 
         try {
             // Use `withTimeoutOrNull` to impose a strict timeout on the entire send operation.
@@ -72,12 +72,12 @@ class TcpClient {
     }
 
     /**
-     * Performs the actual TCP data transmission, including socket creation, connection,
-     * and writing data with optional JSON HTTP headers.
+     * Performs the actual TCP data transmission as raw JSON.
+     * Simplified version that sends JSON directly without HTTP headers.
      *
      * @param serverIP The IP address of the destination server.
      * @param port The TCP port.
-     * @param data The string data (expected to be JSON) to be sent.
+     * @param data The string data (JSON) to be sent.
      * @return A [TcpResult] indicating the outcome.
      */
     private suspend fun performTcpSend(
@@ -109,23 +109,12 @@ class TcpClient {
                 return@withContext TcpResult.Error("Failed to connect to $serverIP:$port")
             }
 
-            // Construct HTTP POST request headers for JSON content.
-            // This makes the data compatible with web servers or applications expecting HTTP.
-            val httpRequest = buildString {
-                appendLine("POST / HTTP/1.1") // Standard HTTP POST method and protocol version.
-                appendLine("Host: $serverIP:$port") // Specifies the host and port.
-                appendLine("Content-Type: ${Constants.DataFormat.CONTENT_TYPE}") // Declare content type as JSON.
-                // Calculate content length based on UTF-8 byte size of the data.
-                appendLine("Content-Length: ${data.toByteArray(Charsets.UTF_8).size}")
-                appendLine("Connection: close") // Request to close the connection after the response.
-                appendLine() // An empty line is required between headers and body in HTTP.
-                append(data) // Append the actual JSON data (body of the request).
-            }
-
             // Create a PrintWriter to write data to the socket's output stream.
             // `true` in PrintWriter constructor enables auto-flushing.
             writer = PrintWriter(socket.getOutputStream(), true)
-            writer.print(httpRequest) // Write the complete HTTP request.
+
+            // Send the JSON data directly with a newline terminator
+            writer.println(data) // Adding newline helps the server detect end of message
             writer.flush() // Ensure all buffered data is sent immediately.
 
             // Check for errors that might have occurred during the write operation.
