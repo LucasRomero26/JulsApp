@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.*
 
 /**
  * Controlador para manejo de ubicaciones GPS
- * Coordina entre LocationRepository y NetworkRepository
+ * Coordina entre LocationRepository y NetworkRepository.
  */
 class LocationController(private val context: Context) {
 
