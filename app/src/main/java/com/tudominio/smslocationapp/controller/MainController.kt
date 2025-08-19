@@ -14,32 +14,34 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Controlador principal de la aplicación que coordina todos los componentes
- * Actúa como el punto central de control para la UI y la lógica de negocio
+ * The main application controller that coordinates all components.
+ * It acts as the central control point for the UI and business logic.
  */
 class MainController(private val context: Context) : ViewModel() {
 
     companion object {
+        // Log tag for this class.
         private const val TAG = Constants.Logs.TAG_MAIN
     }
 
+    // Instance of the LocationController for handling location and network logic.
     private val locationController = LocationController(context)
 
-    // Preferencias de tema
+    // Theme preferences instance to manage UI themes.
     val themePreferences = ThemePreferences(context)
 
-    // Exponer el estado de la aplicación
+    // Exposes the application state as a read-only StateFlow.
     val appState: StateFlow<AppState> = locationController.appState
 
     init {
         Log.d(TAG, "MainController initialized")
 
-        // Verificar permisos inicialmente
+        // Initial check for permissions when the controller is created.
         checkPermissions()
     }
 
     /**
-     * Verificar y actualizar permisos
+     * Checks and updates the permissions status via the LocationController.
      */
     fun checkPermissions() {
         locationController.checkPermissions()
@@ -47,20 +49,20 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Manejar solicitud de permisos concedidos
+     * Handles the event when permissions are granted by the user.
      */
     fun onPermissionsGranted() {
+        // Re-check permissions to update the app state.
         checkPermissions()
 
         val currentState = appState.value
         if (currentState.hasAllPermissions()) {
             Log.d(TAG, "All permissions granted")
 
-            // Mostrar mensaje de éxito
+            // Get current location to verify GPS availability and update UI.
             viewModelScope.launch {
                 locationController.getCurrentAppState().let { state ->
                     if (state.hasAllPermissions()) {
-                        // Opcional: obtener ubicación actual para verificar GPS
                         locationController.getCurrentLocation()
                     }
                 }
@@ -69,7 +71,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Alternar estado de tracking (iniciar/detener)
+     * Toggles the tracking state (starts or stops it).
      */
     fun toggleTracking() {
         viewModelScope.launch {
@@ -83,36 +85,29 @@ class MainController(private val context: Context) : ViewModel() {
         }
     }
 
-    /**
-     * Alternar tema oscuro/claro - CORREGIDO
-     */
+    // The user requested to remove the `toggleTheme` function.
 
+    // The user requested to remove the `setTheme` function.
 
-    /**
-     * Establecer tema específico
-     */
+    // The user requested to remove the `setSystemTheme` function.
 
     /**
-     * Establecer seguimiento del tema del sistema
-     */
-
-    /**
-     * Iniciar tracking de ubicación
+     * Starts location tracking.
      */
     private suspend fun startTracking() {
         Log.d(TAG, "Starting tracking from MainController")
 
-        // Verificar permisos antes de iniciar
+        // Check for permissions before attempting to start.
         if (!appState.value.hasAllPermissions()) {
             Log.w(TAG, "Cannot start tracking - missing permissions")
             return
         }
 
         try {
-            // Iniciar servicio en primer plano
+            // Start the foreground service that will handle location updates.
             startLocationService()
 
-            // Iniciar tracking en el controlador
+            // Initiate the tracking process in the LocationController.
             val result = locationController.startLocationTracking()
 
             result.fold(
@@ -121,7 +116,8 @@ class MainController(private val context: Context) : ViewModel() {
                 },
                 onFailure = { error ->
                     Log.e(TAG, "Failed to start tracking: ${error.message}")
-                    stopLocationService() // Limpiar servicio si falló el tracking
+                    // Stop the service if tracking fails to start to prevent a zombie service.
+                    stopLocationService()
                 }
             )
 
@@ -131,16 +127,16 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Detener tracking de ubicación
+     * Stops location tracking.
      */
     private fun stopTracking() {
         Log.d(TAG, "Stopping tracking from MainController")
 
         try {
-            // Detener tracking en el controlador
+            // Stop the tracking process in the LocationController.
             val result = locationController.stopLocationTracking()
 
-            // Detener servicio
+            // Stop the foreground service.
             stopLocationService()
 
             result.fold(
@@ -158,7 +154,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Iniciar servicio de ubicación en primer plano
+     * Starts the location service in the foreground.
      */
     private fun startLocationService() {
         val intent = Intent(context, LocationService::class.java).apply {
@@ -166,6 +162,7 @@ class MainController(private val context: Context) : ViewModel() {
         }
 
         try {
+            // Use startForegroundService for Android O (API 26) and above.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -178,7 +175,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Detener servicio de ubicación
+     * Stops the location service.
      */
     private fun stopLocationService() {
         val intent = Intent(context, LocationService::class.java).apply {
@@ -194,7 +191,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Obtener ubicación actual sin iniciar tracking
+     * Gets the current location without starting continuous tracking.
      */
     fun getCurrentLocation() {
         viewModelScope.launch {
@@ -212,7 +209,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Testear conexiones a servidores
+     * Tests connections to the configured servers.
      */
     fun testServerConnections() {
         viewModelScope.launch {
@@ -230,7 +227,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Enviar datos de prueba
+     * Sends test data to the servers.
      */
     fun sendTestData() {
         viewModelScope.launch {
@@ -248,45 +245,45 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Limpiar mensajes de estado
+     * Clears any status messages.
      */
     fun clearMessages() {
         locationController.clearMessages()
     }
 
     /**
-     * Resetear estadísticas
+     * Resets tracking statistics.
      */
     fun resetStatistics() {
         locationController.resetStatistics()
     }
 
     /**
-     * Obtener información de diagnóstico - CORREGIDO
+     * Gets diagnostic information.
+     * The user requested to remove any reference to `themePreferences`.
      */
     fun getDiagnosticInfo(): Map<String, String> {
         return locationController.getDiagnosticInfo() + mapOf(
             "app_version" to "1.0.0"
-            // ELIMINAR cualquier referencia a themePreferences
         )
     }
 
     /**
-     * Verificar si se puede iniciar tracking
+     * Checks if tracking can be started.
      */
     fun canStartTracking(): Boolean {
         return locationController.canStartTracking()
     }
 
     /**
-     * Obtener información de red
+     * Gets network information.
      */
     fun getNetworkInfo(): String {
         return locationController.getNetworkInfo()
     }
 
     /**
-     * Procesar ubicaciones pendientes
+     * Processes any pending location updates.
      */
     fun processPendingLocations() {
         viewModelScope.launch {
@@ -304,7 +301,7 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Verificar estado de la aplicación
+     * Gets a summary of the application's current status.
      */
     fun getAppStatus(): String {
         val state = appState.value
@@ -312,21 +309,23 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Manejar eventos del ciclo de vida de la aplicación
+     * Handles app lifecycle event when the app is paused.
      */
     fun onAppPaused() {
         Log.d(TAG, "App paused")
-        // La aplicación puede seguir funcionando en segundo plano
-        // No detenemos el tracking automáticamente
+        // The app can continue running in the background, so we don't stop tracking automatically.
     }
 
+    /**
+     * Handles app lifecycle event when the app is resumed.
+     */
     fun onAppResumed() {
         Log.d(TAG, "App resumed")
 
-        // Verificar permisos al volver a la app
+        // Re-check permissions upon returning to the app.
         checkPermissions()
 
-        // Verificar estado de red
+        // Test server connections if tracking is enabled.
         viewModelScope.launch {
             if (appState.value.isTrackingEnabled) {
                 locationController.testServerConnections()
@@ -335,33 +334,34 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Manejar cambios en la conectividad de red
+     * Handles changes in network connectivity.
+     * @param isConnected `true` if network is connected, `false` otherwise.
      */
     fun onNetworkChanged(isConnected: Boolean) {
         Log.d(TAG, "Network changed - Connected: $isConnected")
 
         if (isConnected && appState.value.isTrackingEnabled) {
-            // Testear conexiones cuando se restaure la red
+            // Test connections when network is restored.
             testServerConnections()
 
-            // Procesar ubicaciones pendientes
+            // Process any pending locations that were queued while offline.
             processPendingLocations()
         }
     }
 
     /**
-     * Manejar emergencias (envío prioritario)
+     * Handles an emergency event by immediately sending the current location multiple times.
      */
     fun handleEmergency() {
         viewModelScope.launch {
             Log.w(TAG, "Emergency mode activated")
 
-            // Obtener ubicación actual inmediatamente
+            // Get the current location immediately.
             val locationResult = locationController.getCurrentLocation()
 
             locationResult.fold(
                 onSuccess = { location ->
-                    // Enviar múltiples veces para asegurar recepción
+                    // Send test data multiple times to ensure reception.
                     repeat(3) {
                         locationController.sendTestData()
                     }
@@ -375,7 +375,8 @@ class MainController(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Obtener configuración actual
+     * Gets the current application configuration.
+     * The user requested to remove the `theme_mode` line.
      */
     fun getCurrentConfiguration(): Map<String, String> {
         return mapOf(
@@ -386,24 +387,23 @@ class MainController(private val context: Context) : ViewModel() {
             "update_interval" to "${Constants.LOCATION_UPDATE_INTERVAL}ms",
             "network_timeout" to "${Constants.NETWORK_TIMEOUT}ms",
             "max_retries" to Constants.MAX_RETRY_ATTEMPTS.toString()
-            // ELIMINAR la línea del theme_mode
         )
     }
 
     /**
-     * Limpiar recursos cuando se destruye el ViewModel
+     * Cleans up resources when the ViewModel is destroyed.
      */
     override fun onCleared() {
         super.onCleared()
 
         Log.d(TAG, "MainController being cleared")
 
-        // Detener tracking si está activo
+        // Stop tracking if it's still active to prevent resource leaks.
         if (appState.value.isTrackingEnabled) {
             stopTracking()
         }
 
-        // Limpiar controlador de ubicación
+        // Clean up the location controller's resources.
         locationController.cleanup()
 
         Log.d(TAG, "MainController cleared successfully")

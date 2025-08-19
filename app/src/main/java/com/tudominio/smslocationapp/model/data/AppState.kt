@@ -1,43 +1,46 @@
 package com.tudominio.smslocation.model.data
 
 /**
- * Data class que representa el estado global de la aplicación
+ * Data class representing the global application state.
+ * This immutable data class holds all relevant UI and operational states of the application,
+ * making it easy to manage and observe changes.
  */
 data class AppState(
-    // Estado de tracking
-    val isTrackingEnabled: Boolean = false,
-    val isLocationServiceRunning: Boolean = false,
+    // Tracking status
+    val isTrackingEnabled: Boolean = false, // Indicates if location tracking is currently enabled by the user.
+    val isLocationServiceRunning: Boolean = false, // Indicates if the background location service is actively running.
 
-    // Datos de ubicación
-    val currentLocation: LocationData? = null,
-    val lastKnownLocation: LocationData? = null,
-    val isLoadingLocation: Boolean = false,
+    // Location data
+    val currentLocation: LocationData? = null, // The most recently obtained location data.
+    val lastKnownLocation: LocationData? = null, // The last successfully obtained location, used for display even if current is null.
+    val isLoadingLocation: Boolean = false, // True when the app is actively trying to get a location.
 
-    // Estado de permisos
-    val hasLocationPermission: Boolean = false,
-    val hasBackgroundLocationPermission: Boolean = false,
-    val permissionsRequested: Boolean = false,
+    // Permission status
+    val hasLocationPermission: Boolean = false, // True if foreground location permission is granted.
+    val hasBackgroundLocationPermission: Boolean = false, // True if background location permission is granted (for Android 10+).
+    val permissionsRequested: Boolean = false, // True if permissions have been requested at least once.
 
-    // Estado de servidores
-    val serverStatus: ServerStatus = ServerStatus(),
+    // Server status
+    val serverStatus: ServerStatus = ServerStatus(), // Holds detailed status of connections to various servers.
 
-    // Mensajes y errores
-    val statusMessage: String = "",
-    val errorMessage: String = "",
-    val isShowingError: Boolean = false,
+    // Messages and errors for UI display
+    val statusMessage: String = "", // A general status message to display to the user (e.g., "Tracking started").
+    val errorMessage: String = "", // An error message to display to the user.
+    val isShowingError: Boolean = false, // True if an error message is currently active and should be shown.
 
-    // Configuración
-    val isFirstLaunch: Boolean = true,
-    val isDebugging: Boolean = false,
+    // Configuration flags
+    val isFirstLaunch: Boolean = true, // True if this is the very first time the app is launched.
+    val isDebugging: Boolean = false, // True if the app is in debug mode, potentially showing extra info.
 
-    // Estadísticas
-    val sessionStartTime: Long = 0L,
-    val totalLocationsSent: Int = 0,
-    val sessionDuration: Long = 0L
+    // Statistics
+    val sessionStartTime: Long = 0L, // Timestamp (in milliseconds) when the current tracking session started.
+    val totalLocationsSent: Int = 0, // Count of successful location data transmissions.
+    val sessionDuration: Long = 0L // Stores the total duration of the last completed session.
 ) {
 
     /**
-     * Verificar si la aplicación está lista para iniciar tracking
+     * Checks if the application is ready to start tracking.
+     * Requires all necessary permissions to be granted and tracking/service not already active.
      */
     fun canStartTracking(): Boolean {
         return hasLocationPermission &&
@@ -47,31 +50,34 @@ data class AppState(
     }
 
     /**
-     * Verificar si todos los permisos están concedidos
+     * Checks if both foreground and background location permissions are granted.
      */
     fun hasAllPermissions(): Boolean {
         return hasLocationPermission && hasBackgroundLocationPermission
     }
 
     /**
-     * Verificar si hay ubicación válida disponible
+     * Checks if a valid current location is available.
      */
     fun hasValidLocation(): Boolean {
         return currentLocation?.isValid() == true
     }
 
     /**
-     * Obtener tiempo transcurrido desde el inicio de sesión
+     * Gets the formatted duration of the current or last tracking session.
+     * Formatted as HH:MM:SS.
      */
     fun getSessionDurationFormatted(): String {
-        if (sessionStartTime == 0L) return "00:00:00"
+        if (sessionStartTime == 0L) return "00:00:00" // If session hasn't started, duration is zero.
 
+        // Calculate duration based on whether tracking is active or stopped.
         val duration = if (isTrackingEnabled) {
-            System.currentTimeMillis() - sessionStartTime
+            System.currentTimeMillis() - sessionStartTime // Current session duration.
         } else {
-            sessionDuration
+            sessionDuration // Duration of the last completed session.
         }
 
+        // Convert milliseconds to hours, minutes, and seconds.
         val hours = duration / 3600000
         val minutes = (duration % 3600000) / 60000
         val seconds = (duration % 60000) / 1000
@@ -80,12 +86,14 @@ data class AppState(
     }
 
     /**
-     * Actualizar estado de tracking iniciado
+     * Updates the AppState to reflect that tracking has started.
+     * Resets error messages and sets the session start time if not already set.
      */
     fun startTracking(): AppState {
         return copy(
             isTrackingEnabled = true,
             isLocationServiceRunning = true,
+            // Set sessionStartTime only if it's currently 0L (first start of a new session).
             sessionStartTime = if (sessionStartTime == 0L) System.currentTimeMillis() else sessionStartTime,
             statusMessage = "Location tracking started",
             errorMessage = "",
@@ -94,19 +102,20 @@ data class AppState(
     }
 
     /**
-     * Actualizar estado de tracking detenido
+     * Updates the AppState to reflect that tracking has stopped.
+     * Calculates and stores the final session duration.
      */
     fun stopTracking(): AppState {
         val finalDuration = if (sessionStartTime > 0L) {
-            System.currentTimeMillis() - sessionStartTime
+            System.currentTimeMillis() - sessionStartTime // Calculate final duration.
         } else {
-            sessionDuration
+            sessionDuration // Use previous duration if session wasn't actively running.
         }
 
         return copy(
             isTrackingEnabled = false,
             isLocationServiceRunning = false,
-            sessionDuration = finalDuration,
+            sessionDuration = finalDuration, // Store the calculated duration.
             statusMessage = "Location tracking stopped",
             errorMessage = "",
             isShowingError = false
@@ -114,19 +123,23 @@ data class AppState(
     }
 
     /**
-     * Actualizar ubicación actual
+     * Updates the current location and increments the total locations sent count.
+     * Also updates `lastKnownLocation` to preserve the previous `currentLocation`.
+     * @param location The new [LocationData] received.
      */
     fun updateLocation(location: LocationData): AppState {
         return copy(
             currentLocation = location,
-            lastKnownLocation = currentLocation ?: location,
-            isLoadingLocation = false,
-            totalLocationsSent = totalLocationsSent + 1
+            lastKnownLocation = currentLocation ?: location, // Keep previous current if new is first.
+            isLoadingLocation = false, // Location has been received, so no longer loading.
+            totalLocationsSent = totalLocationsSent + 1 // Increment counter for sent locations.
         )
     }
 
     /**
-     * Actualizar estado de permisos
+     * Updates the permission status in the AppState.
+     * @param locationPermission Boolean indicating foreground location permission status.
+     * @param backgroundPermission Boolean indicating background location permission status.
      */
     fun updatePermissions(
         locationPermission: Boolean,
@@ -135,34 +148,38 @@ data class AppState(
         return copy(
             hasLocationPermission = locationPermission,
             hasBackgroundLocationPermission = backgroundPermission,
-            permissionsRequested = true
+            permissionsRequested = true // Mark that permissions have been checked/requested.
         )
     }
 
     /**
-     * Mostrar mensaje de éxito
+     * Sets a success message to be displayed to the user.
+     * Clears any active error messages.
+     * @param message The success message string.
      */
     fun showSuccessMessage(message: String): AppState {
         return copy(
             statusMessage = message,
-            errorMessage = "",
-            isShowingError = false
+            errorMessage = "", // Clear any existing error message.
+            isShowingError = false // Indicate no error is currently active.
         )
     }
 
     /**
-     * Mostrar mensaje de error
+     * Sets an error message to be displayed to the user.
+     * Clears any active status messages and sets the error flag.
+     * @param message The error message string.
      */
     fun showErrorMessage(message: String): AppState {
         return copy(
             errorMessage = message,
-            statusMessage = "",
-            isShowingError = true
+            statusMessage = "", // Clear any existing status message.
+            isShowingError = true // Indicate an error is currently active.
         )
     }
 
     /**
-     * Limpiar mensajes
+     * Clears all status and error messages from the AppState.
      */
     fun clearMessages(): AppState {
         return copy(
@@ -173,26 +190,29 @@ data class AppState(
     }
 
     /**
-     * Actualizar estado del servidor
+     * Updates the server status in the AppState.
+     * @param newServerStatus The latest [ServerStatus] object.
      */
     fun updateServerStatus(newServerStatus: ServerStatus): AppState {
         return copy(serverStatus = newServerStatus)
     }
 
     /**
-     * Obtener resumen del estado actual
+     * Provides a summary string of the application's current operational status.
+     * This is useful for displaying a concise status to the user.
      */
     fun getStatusSummary(): String {
         return when {
             !hasAllPermissions() -> "Permissions required"
             isTrackingEnabled -> "Tracking active - ${serverStatus.getActiveConnectionsCount()}/4 servers connected"
             hasValidLocation() -> "Ready to track"
-            else -> "Waiting for GPS signal"
+            else -> "Waiting for GPS signal" // Default status if none of the above conditions met.
         }
     }
 
     /**
-     * Verificar si la app está en estado activo
+     * Checks if the application is in an active operational state,
+     * meaning tracking is enabled, a valid location is available, and there's server connectivity.
      */
     fun isActive(): Boolean {
         return isTrackingEnabled && hasValidLocation() && serverStatus.hasAnyConnection()

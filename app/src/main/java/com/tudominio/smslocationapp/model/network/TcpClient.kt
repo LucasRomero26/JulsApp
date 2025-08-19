@@ -11,50 +11,58 @@ import java.net.SocketTimeoutException
 import java.io.IOException
 
 /**
- * Cliente TCP para envío de datos de ubicación
+ * TCP client for sending location data.
+ * This class handles the low-level TCP communication, including connection, data writing,
+ * timeouts, and error handling. It also supports sending data with HTTP headers for compatibility.
  */
 class TcpClient {
 
     companion object {
+        // Tag for logging messages related to TCP operations.
         private const val TAG = Constants.Logs.TAG_NETWORK
     }
 
     /**
-     * Resultado del envío TCP
+     * Sealed class representing the possible outcomes of a TCP send operation.
+     * This provides a clear and exhaustive way to handle different results.
      */
     sealed class TcpResult {
-        object Success : TcpResult()
-        data class Error(val message: String, val exception: Throwable? = null) : TcpResult()
-        object Timeout : TcpResult()
+        object Success : TcpResult() // Indicates that data was sent successfully.
+        data class Error(val message: String, val exception: Throwable? = null) : TcpResult() // Indicates an error occurred.
+        object Timeout : TcpResult() // Indicates that the operation timed out.
     }
 
     /**
-     * Enviar datos via TCP a un servidor específico
+     * Sends data via TCP to a specific server.
+     * This method wraps the actual send operation with a timeout.
      *
-     * @param serverIP IP del servidor destino
-     * @param port Puerto TCP (normalmente 6000)
-     * @param data Datos a enviar
-     * @return Resultado del envío
+     * @param serverIP The IP address of the destination server.
+     * @param port The TCP port (defaults to [Constants.TCP_PORT], typically 6000).
+     * @param data The string data to be sent.
+     * @return A [TcpResult] indicating the outcome of the send operation.
      */
     suspend fun sendData(
         serverIP: String,
         port: Int = Constants.TCP_PORT,
         data: String
-    ): TcpResult = withContext(Dispatchers.IO) {
+    ): TcpResult = withContext(Dispatchers.IO) { // Ensure this runs on an IO dispatcher.
 
         Log.d(TAG, "TCP: Attempting to send to $serverIP:$port - Data: $data")
 
         try {
-            // Usar timeout para evitar bloqueos indefinidos
+            // Use `withTimeoutOrNull` to impose a strict timeout on the entire send operation.
+            // If the operation exceeds `Constants.NETWORK_TIMEOUT`, `result` will be null.
             val result = withTimeoutOrNull(Constants.NETWORK_TIMEOUT.toLong()) {
-                performTcpSend(serverIP, port, data)
+                performTcpSend(serverIP, port, data) // Delegate to the actual send logic.
             }
 
+            // If `result` is null, it means a timeout occurred. Log and return Timeout.
             return@withContext result ?: TcpResult.Timeout.also {
                 Log.w(TAG, "TCP: Timeout sending to $serverIP:$port")
             }
 
         } catch (e: Exception) {
+            // Catch any unexpected exceptions that might occur outside of `performTcpSend` or `withTimeoutOrNull`.
             Log.e(TAG, "TCP: Error sending to $serverIP:$port", e)
             return@withContext TcpResult.Error(
                 message = "TCP Error: ${e.message}",
@@ -64,7 +72,13 @@ class TcpClient {
     }
 
     /**
-     * Realizar el envío TCP real con headers JSON
+     * Performs the actual TCP data transmission, including socket creation, connection,
+     * and writing data with optional JSON HTTP headers.
+     *
+     * @param serverIP The IP address of the destination server.
+     * @param port The TCP port.
+     * @param data The string data (expected to be JSON) to be sent.
+     * @return A [TcpResult] indicating the outcome.
      */
     private suspend fun performTcpSend(
         serverIP: String,
@@ -76,39 +90,45 @@ class TcpClient {
         var writer: PrintWriter? = null
 
         try {
-            // Crear socket con timeout
+            // Create a new socket.
             socket = Socket().apply {
+                // Set the socket read timeout to prevent indefinite blocking on input stream operations.
                 soTimeout = Constants.NETWORK_TIMEOUT
-                tcpNoDelay = true // Enviar inmediatamente sin buffer
+                // Enable TCP_NODELAY to disable the Nagle algorithm, ensuring data is sent immediately.
+                tcpNoDelay = true
             }
 
-            // Conectar al servidor
+            // Connect to the server with a specific connection timeout.
             socket.connect(
                 java.net.InetSocketAddress(serverIP, port),
                 Constants.NETWORK_TIMEOUT
             )
 
+            // Verify if the socket is successfully connected.
             if (!socket.isConnected) {
                 return@withContext TcpResult.Error("Failed to connect to $serverIP:$port")
             }
 
-            // Crear headers HTTP para JSON (opcional, mejora compatibilidad con servidores web)
+            // Construct HTTP POST request headers for JSON content.
+            // This makes the data compatible with web servers or applications expecting HTTP.
             val httpRequest = buildString {
-                appendLine("POST / HTTP/1.1")
-                appendLine("Host: $serverIP:$port")
-                appendLine("Content-Type: ${Constants.DataFormat.CONTENT_TYPE}")
+                appendLine("POST / HTTP/1.1") // Standard HTTP POST method and protocol version.
+                appendLine("Host: $serverIP:$port") // Specifies the host and port.
+                appendLine("Content-Type: ${Constants.DataFormat.CONTENT_TYPE}") // Declare content type as JSON.
+                // Calculate content length based on UTF-8 byte size of the data.
                 appendLine("Content-Length: ${data.toByteArray(Charsets.UTF_8).size}")
-                appendLine("Connection: close")
-                appendLine() // Línea vacía antes del body
-                append(data)
+                appendLine("Connection: close") // Request to close the connection after the response.
+                appendLine() // An empty line is required between headers and body in HTTP.
+                append(data) // Append the actual JSON data (body of the request).
             }
 
-            // Enviar datos con headers HTTP
+            // Create a PrintWriter to write data to the socket's output stream.
+            // `true` in PrintWriter constructor enables auto-flushing.
             writer = PrintWriter(socket.getOutputStream(), true)
-            writer.print(httpRequest)
-            writer.flush()
+            writer.print(httpRequest) // Write the complete HTTP request.
+            writer.flush() // Ensure all buffered data is sent immediately.
 
-            // Verificar que el writer no tenga errores
+            // Check for errors that might have occurred during the write operation.
             if (writer.checkError()) {
                 return@withContext TcpResult.Error("Error writing JSON data to TCP stream")
             }
@@ -117,10 +137,12 @@ class TcpClient {
             return@withContext TcpResult.Success
 
         } catch (e: SocketTimeoutException) {
+            // Handle specific SocketTimeoutException for connection or read/write timeouts.
             Log.w(TAG, "TCP: Socket timeout for $serverIP:$port", e)
             return@withContext TcpResult.Timeout
 
         } catch (e: IOException) {
+            // Handle general IO exceptions (e.g., network issues, broken pipe).
             Log.e(TAG, "TCP: IO error for $serverIP:$port", e)
             return@withContext TcpResult.Error(
                 message = "TCP IO Error: ${e.message}",
@@ -128,6 +150,7 @@ class TcpClient {
             )
 
         } catch (e: Exception) {
+            // Catch any other unexpected exceptions.
             Log.e(TAG, "TCP: Unexpected error for $serverIP:$port", e)
             return@withContext TcpResult.Error(
                 message = "TCP Unexpected Error: ${e.message}",
@@ -135,22 +158,23 @@ class TcpClient {
             )
 
         } finally {
-            // Cleanup resources
+            // Ensure resources are closed in all cases to prevent leaks.
             try {
-                writer?.close()
-                socket?.close()
+                writer?.close() // Close the PrintWriter.
+                socket?.close() // Close the socket.
             } catch (e: Exception) {
-                Log.w(TAG, "TCP: Error closing resources", e)
+                Log.w(TAG, "TCP: Error closing resources", e) // Log any errors during cleanup.
             }
         }
     }
 
     /**
-     * Verificar conectividad TCP a un servidor
+     * Tests TCP connectivity to a specific server by attempting to establish a connection.
+     * This is a quick check to see if the server is reachable on the given port.
      *
-     * @param serverIP IP del servidor
-     * @param port Puerto TCP
-     * @return true si se puede conectar, false en caso contrario
+     * @param serverIP The IP address of the server.
+     * @param port The TCP port.
+     * @return `true` if a connection can be established within the timeout, `false` otherwise.
      */
     suspend fun testConnection(
         serverIP: String,
@@ -158,31 +182,33 @@ class TcpClient {
     ): Boolean = withContext(Dispatchers.IO) {
 
         try {
-            withTimeoutOrNull(3000L) { // Timeout más corto para test
-                Socket().use { socket ->
-                    socket.soTimeout = 3000
+            // Use `withTimeoutOrNull` for a shorter timeout specifically for connection tests.
+            withTimeoutOrNull(3000L) { // Timeout set to 3 seconds.
+                Socket().use { socket -> // `use` ensures the socket is closed automatically.
+                    socket.soTimeout = 3000 // Set read timeout for the socket.
                     socket.connect(
                         java.net.InetSocketAddress(serverIP, port),
-                        3000
+                        3000 // Connection timeout.
                     )
-                    socket.isConnected
+                    socket.isConnected // Return true if connected.
                 }
-            } ?: false
+            } ?: false // If timeout occurs, `withTimeoutOrNull` returns null, so return false.
 
         } catch (e: Exception) {
+            // Log a debug message for failed connection tests (less severe than send errors).
             Log.d(TAG, "TCP: Test connection failed for $serverIP:$port - ${e.message}")
-            false
+            false // Return false if any exception occurs during the test.
         }
     }
 
     /**
-     * Enviar datos con reintentos automáticos
+     * Sends data via TCP to a server with automatic retries in case of failure.
      *
-     * @param serverIP IP del servidor
-     * @param port Puerto TCP
-     * @param data Datos a enviar
-     * @param maxRetries Número máximo de reintentos
-     * @return Resultado final después de todos los intentos
+     * @param serverIP The IP address of the server.
+     * @param port The TCP port.
+     * @param data The data string to send.
+     * @param maxRetries The maximum number of retry attempts (defaults to [Constants.MAX_RETRY_ATTEMPTS]).
+     * @return The final [TcpResult] after all attempts have been made.
      */
     suspend fun sendDataWithRetry(
         serverIP: String,
@@ -191,23 +217,25 @@ class TcpClient {
         maxRetries: Int = Constants.MAX_RETRY_ATTEMPTS
     ): TcpResult {
 
-        repeat(maxRetries) { attempt ->
-            val result = sendData(serverIP, port, data)
+        repeat(maxRetries) { attempt -> // Loop for the specified number of retries.
+            val result = sendData(serverIP, port, data) // Attempt to send data.
 
             if (result is TcpResult.Success) {
+                // If successful, log if it was a retry and then return success.
                 if (attempt > 0) {
                     Log.d(TAG, "TCP: Success on retry $attempt for $serverIP:$port")
                 }
                 return result
             }
 
-            // Si no es el último intento, esperar antes de reintentar
+            // If it's not the last attempt, log and introduce a delay before retrying.
             if (attempt < maxRetries - 1) {
-                Log.d(TAG, "TCP: Retry $attempt failed for $serverIP:$port, retrying...")
-                kotlinx.coroutines.delay(Constants.RETRY_DELAY)
+                Log.d(TAG, "TCP: Retry $attempt failed for $serverIP:$port, retrying in ${Constants.RETRY_DELAY}ms...")
+                kotlinx.coroutines.delay(Constants.RETRY_DELAY) // Pause for the defined retry delay.
             }
         }
 
+        // If all attempts fail, log a warning and return an error result.
         Log.w(TAG, "TCP: All $maxRetries attempts failed for $serverIP:$port")
         return TcpResult.Error("Failed after $maxRetries attempts")
     }
