@@ -14,6 +14,14 @@ object Constants {
     const val TCP_PORT = 6000 // Puerto TCP para comunicación confiable
     const val UDP_PORT = 6001 // Puerto UDP para comunicación rápida
 
+    // Cloudflare Tunnel Configuration
+    // Hostname provided by Cloudflare Access and local forwarding port
+    const val CLOUDFLARE_TUNNEL_HOSTNAME = "tcp-6000.electronicdesign.app"
+    const val CLOUDFLARE_LOCAL_PORT = 6002
+    const val CLOUDFLARE_LOCAL_IP = "127.0.0.1"
+    const val CLOUDFLARE_BINARY_URL =
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+
     // GPS Location Configuration
     // Interval at which location updates are requested (in milliseconds).
     const val LOCATION_UPDATE_INTERVAL = 5000L // 5 seconds.

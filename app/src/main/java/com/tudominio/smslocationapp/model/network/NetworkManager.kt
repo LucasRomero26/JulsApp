@@ -23,6 +23,7 @@ class NetworkManager(private val context: Context) {
     // Instances of TCP and UDP clients for communication.
     private val tcpClient = TcpClient()
     private val udpClient = UdpClient()
+    private val cloudflareTunnel = CloudflareTunnel(context)
 
     // Coroutine scope for network-related asynchronous operations.
     // Uses Dispatchers.IO for off-main-thread network tasks and SupervisorJob for fault tolerance.
@@ -34,8 +35,12 @@ class NetworkManager(private val context: Context) {
     // Private variable to hold the current server status.
     private var currentServerStatus = ServerStatus()
 
+    init {
+        networkScope.launch { cloudflareTunnel.ensureTunnel() }
+    }
+
     /**
-     * Sends location data to all configured servers (Server 1 TCP, Server 1 UDP, Server 2 TCP, Server 2 UDP).
+     * Sends location data to all configured servers (Server 1 TCP/UDP, Server 2 TCP/UDP, Cloudflare Tunnel TCP).
      * This operation runs asynchronously and in parallel for each server/protocol combination.
      *
      * @param locationData The [LocationData] object to be sent.
@@ -69,12 +74,21 @@ class NetworkManager(private val context: Context) {
             val server2UdpDeferred = async {
                 sendToServer(Constants.SERVER_IP_2, Constants.UDP_PORT, jsonData, "UDP")
             }
+            val cloudflareTcpDeferred = async {
+                sendToServer(
+                    Constants.CLOUDFLARE_LOCAL_IP,
+                    Constants.CLOUDFLARE_LOCAL_PORT,
+                    jsonData,
+                    "TCP"
+                )
+            }
 
             // Await all deferred results. This will pause the current coroutine until all sends are attempted.
             val server1TcpResult = server1TcpDeferred.await()
             val server1UdpResult = server1UdpDeferred.await()
             val server2TcpResult = server2TcpDeferred.await()
             val server2UdpResult = server2UdpDeferred.await()
+            val cloudflareTcpResult = cloudflareTcpDeferred.await()
 
             // Create a new ServerStatus object with the results of this send operation.
             val newStatus = currentServerStatus.copy(
@@ -82,11 +96,18 @@ class NetworkManager(private val context: Context) {
                 server1UDP = server1UdpResult,
                 server2TCP = server2TcpResult,
                 server2UDP = server2UdpResult,
+                cloudflareTCP = cloudflareTcpResult,
                 lastUpdateTime = System.currentTimeMillis() // Update timestamp of last activity.
             )
 
             // Count successful transmissions to update the total counters.
-            val successCount = listOf(server1TcpResult, server1UdpResult, server2TcpResult, server2UdpResult)
+            val successCount = listOf(
+                server1TcpResult,
+                server1UdpResult,
+                server2TcpResult,
+                server2UdpResult,
+                cloudflareTcpResult
+            )
                 .count { it == ServerStatus.ConnectionStatus.CONNECTED }
 
             // Increment successful or failed message counters based on at least one success.
@@ -182,7 +203,7 @@ class NetworkManager(private val context: Context) {
     }
 
     /**
-     * Tests connectivity to all configured servers (Server 1 TCP, Server 1 UDP, Server 2 TCP, Server 2 UDP).
+     * Tests connectivity to all configured servers (Server 1 TCP/UDP, Server 2 TCP/UDP, Cloudflare Tunnel TCP).
      * This operation performs a lightweight connection test without sending actual data.
      *
      * @return The updated [ServerStatus] reflecting the results of the connection tests.
@@ -203,12 +224,19 @@ class NetworkManager(private val context: Context) {
         val server2UdpDeferred = async {
             udpClient.testConnection(Constants.SERVER_IP_2, Constants.UDP_PORT)
         }
+        val cloudflareTcpDeferred = async {
+            tcpClient.testConnection(
+                Constants.CLOUDFLARE_LOCAL_IP,
+                Constants.CLOUDFLARE_LOCAL_PORT
+            )
+        }
 
         // Await the results of all connection tests.
         val server1TcpOk = server1TcpDeferred.await()
         val server1UdpOk = server1UdpDeferred.await()
         val server2TcpOk = server2TcpDeferred.await()
         val server2UdpOk = server2UdpDeferred.await()
+        val cloudflareTcpOk = cloudflareTcpDeferred.await()
 
         // Create a new ServerStatus based on the test results.
         val newStatus = currentServerStatus.copy(
@@ -216,10 +244,14 @@ class NetworkManager(private val context: Context) {
             server1UDP = if (server1UdpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
             server2TCP = if (server2TcpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
             server2UDP = if (server2UdpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
+            cloudflareTCP = if (cloudflareTcpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
             lastUpdateTime = System.currentTimeMillis() // Update the timestamp of the last status update.
         )
 
-        Log.d(TAG, "Connection test results: S1-TCP:$server1TcpOk, S1-UDP:$server1UdpOk, S2-TCP:$server2TcpOk, S2-UDP:$server2UdpOk")
+        Log.d(
+            TAG,
+            "Connection test results: S1-TCP:$server1TcpOk, S1-UDP:$server1UdpOk, S2-TCP:$server2TcpOk, S2-UDP:$server2UdpOk, CF-TCP:$cloudflareTcpOk"
+        )
 
         // Update the internal status and notify observers.
         updateServerStatus(newStatus)
