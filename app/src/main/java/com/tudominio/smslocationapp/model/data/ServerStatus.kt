@@ -1,132 +1,109 @@
 package com.tudominio.smslocation.model.data
 
 /**
- * Data class representing the connection status of the servers.
- * This class provides a comprehensive overview of the connectivity to different
- * server endpoints (TCP/UDP for two servers) and keeps track of transmission statistics.
+ * ServerStatus optimizado para solo UDP (2 conexiones en lugar de 4).
+ * TCP eliminado completamente.
  */
 data class ServerStatus(
-    val server1TCP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Status of Server 1 TCP connection
-    val server1UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Status of Server 1 UDP connection
-    val server2TCP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Status of Server 2 TCP connection
-    val server2UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Status of Server 2 UDP connection
-    val lastUpdateTime: Long = 0L,     // Timestamp of the last status update for any connection.
-    val lastSuccessfulSend: Long = 0L, // Timestamp of the last successful data transmission.
-    val totalSentMessages: Int = 0,    // Counter for successfully sent messages.
-    val totalFailedMessages: Int = 0   // Counter for failed message transmissions.
+    val server1TCP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Siempre desconectado (eliminado)
+    val server1UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // UDP Server 1
+    val server2TCP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Siempre desconectado (eliminado)
+    val server2UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // UDP Server 2
+    val lastUpdateTime: Long = 0L,
+    val lastSuccessfulSend: Long = 0L,
+    val totalSentMessages: Int = 0,
+    val totalFailedMessages: Int = 0
 ) {
 
-    /**
-     * Enum to represent the state of a network connection.
-     */
     enum class ConnectionStatus {
-        CONNECTED,      // Connection is successfully established and active.
-        DISCONNECTED,   // No active connection.
-        CONNECTING,     // Attempting to establish a connection.
-        ERROR,          // An error occurred during connection or communication.
-        TIMEOUT         // The connection attempt or operation timed out.
+        CONNECTED,
+        DISCONNECTED,
+        CONNECTING,
+        ERROR,
+        TIMEOUT
     }
 
     /**
-     * Checks if at least one server connection is active (in a CONNECTED state).
-     * @return `true` if any connection is active, `false` otherwise.
+     * Verificar si hay alguna conexión UDP activa
      */
     fun hasAnyConnection(): Boolean {
-        return server1TCP == ConnectionStatus.CONNECTED ||
-                server1UDP == ConnectionStatus.CONNECTED ||
-                server2TCP == ConnectionStatus.CONNECTED ||
+        // Solo considerar UDP (TCP siempre será DISCONNECTED)
+        return server1UDP == ConnectionStatus.CONNECTED ||
                 server2UDP == ConnectionStatus.CONNECTED
     }
 
     /**
-     * Checks if all configured server connections are active (in a CONNECTED state).
-     * @return `true` if all four connections are active, `false` otherwise.
+     * Verificar si todas las conexiones UDP están activas
      */
     fun hasAllConnections(): Boolean {
-        return server1TCP == ConnectionStatus.CONNECTED &&
-                server1UDP == ConnectionStatus.CONNECTED &&
-                server2TCP == ConnectionStatus.CONNECTED &&
+        // Solo UDP debe estar conectado (TCP eliminado)
+        return server1UDP == ConnectionStatus.CONNECTED &&
                 server2UDP == ConnectionStatus.CONNECTED
     }
 
     /**
-     * Returns the number of currently active (CONNECTED) server connections.
-     * @return An integer representing the count of active connections.
+     * Contar conexiones UDP activas (máximo 2)
      */
     fun getActiveConnectionsCount(): Int {
         var count = 0
-        if (server1TCP == ConnectionStatus.CONNECTED) count++
+        // Solo contar UDP
         if (server1UDP == ConnectionStatus.CONNECTED) count++
-        if (server2TCP == ConnectionStatus.CONNECTED) count++
         if (server2UDP == ConnectionStatus.CONNECTED) count++
         return count
     }
 
     /**
-     * Calculates the success rate of message transmissions as a percentage.
-     * @return A float value representing the success rate (0-100), or 0 if no messages have been attempted.
+     * Tasa de éxito de envíos
      */
     fun getSuccessRate(): Float {
         val total = totalSentMessages + totalFailedMessages
         return if (total > 0) {
             (totalSentMessages.toFloat() / total.toFloat()) * 100f
         } else {
-            0f // Avoid division by zero if no messages have been sent or failed.
+            0f
         }
     }
 
     /**
-     * Updates the connection status for a specific server and protocol.
-     * This is an immutable update, returning a new `ServerStatus` instance.
-     * @param serverNumber The identifier for the server (1 or 2).
-     * @param protocol The protocol used ("TCP" or "UDP"). Case-insensitive.
-     * @param status The new [ConnectionStatus] to set for the specified connection.
-     * @return A new `ServerStatus` object with the updated connection status and `lastUpdateTime`.
+     * Actualizar estado de servidor específico
+     * Solo UDP es relevante ahora
      */
     fun updateServerStatus(
         serverNumber: Int,
         protocol: String,
         status: ConnectionStatus
     ): ServerStatus {
-        // Use `when` expression for concise conditional updates.
-        return when (serverNumber to protocol.uppercase()) { // Convert protocol to uppercase for robust matching.
-            1 to "TCP" -> copy(server1TCP = status, lastUpdateTime = System.currentTimeMillis())
+        return when (serverNumber to protocol.uppercase()) {
             1 to "UDP" -> copy(server1UDP = status, lastUpdateTime = System.currentTimeMillis())
-            2 to "TCP" -> copy(server2TCP = status, lastUpdateTime = System.currentTimeMillis())
             2 to "UDP" -> copy(server2UDP = status, lastUpdateTime = System.currentTimeMillis())
-            else -> this // If no match, return the current instance unchanged.
+            // TCP ignorado completamente
+            else -> this
         }
     }
 
     /**
-     * Increments the counter for successfully sent messages.
-     * Also updates `lastSuccessfulSend` and `lastUpdateTime`.
-     * @return A new `ServerStatus` object with updated counters and timestamps.
+     * Incrementar contador de envíos exitosos
      */
     fun incrementSuccessfulSend(): ServerStatus {
         return copy(
             totalSentMessages = totalSentMessages + 1,
-            lastSuccessfulSend = System.currentTimeMillis(), // Record the time of this success.
-            lastUpdateTime = System.currentTimeMillis() // Update the general last activity time.
+            lastSuccessfulSend = System.currentTimeMillis(),
+            lastUpdateTime = System.currentTimeMillis()
         )
     }
 
     /**
-     * Increments the counter for failed message transmissions.
-     * Also updates `lastUpdateTime`.
-     * @return A new `ServerStatus` object with updated counters and timestamps.
+     * Incrementar contador de envíos fallidos
      */
     fun incrementFailedSend(): ServerStatus {
         return copy(
             totalFailedMessages = totalFailedMessages + 1,
-            lastUpdateTime = System.currentTimeMillis() // Update the general last activity time.
+            lastUpdateTime = System.currentTimeMillis()
         )
     }
 
     /**
-     * Resets the message counters (successful and failed sends) to zero.
-     * Also updates `lastUpdateTime`.
-     * @return A new `ServerStatus` object with reset counters.
+     * Resetear contadores
      */
     fun resetCounters(): ServerStatus {
         return copy(
@@ -137,26 +114,57 @@ data class ServerStatus(
     }
 
     /**
-     * Provides a summary string of the overall server connection status.
-     * @return A descriptive string like "All servers connected", "1 of 4 connections active", etc.
+     * Texto de estado general optimizado para UDP
      */
     fun getOverallStatusText(): String {
         val activeConnections = getActiveConnectionsCount()
         return when (activeConnections) {
-            0 -> "All servers disconnected"
-            4 -> "All servers connected"
-            else -> "$activeConnections of 4 connections active" // E.g., "1 of 4 connections active"
+            0 -> "All UDP servers disconnected"
+            2 -> "All UDP servers connected"
+            else -> "$activeConnections of 2 UDP connections active"
         }
     }
 
     /**
-     * Checks if there has been any recent activity (status update or send attempt) within the last 10 seconds.
-     * This can be used to determine if the connection status information is fresh.
-     * @return `true` if `lastUpdateTime` is within the last 10 seconds, `false` otherwise.
+     * Verificar actividad reciente
      */
     fun hasRecentActivity(): Boolean {
         val currentTime = System.currentTimeMillis()
-        val tenSecondsMillis = 10 * 1000L // 10 seconds in milliseconds.
+        val tenSecondsMillis = 10 * 1000L
         return (currentTime - lastUpdateTime) < tenSecondsMillis
+    }
+
+    /**
+     * Información detallada UDP
+     */
+    fun getUdpStatusDetails(): String {
+        return "UDP Status - Server1: $server1UDP, Server2: $server2UDP, " +
+                "Active: ${getActiveConnectionsCount()}/2, " +
+                "Success Rate: ${String.format("%.1f", getSuccessRate())}%"
+    }
+
+    /**
+     * Verificar si el estado es óptimo (todas las conexiones UDP activas)
+     */
+    fun isOptimalState(): Boolean {
+        return hasAllConnections() && hasRecentActivity()
+    }
+
+    /**
+     * Tiempo desde la última actualización en segundos
+     */
+    fun getSecondsSinceLastUpdate(): Long {
+        return if (lastUpdateTime > 0) {
+            (System.currentTimeMillis() - lastUpdateTime) / 1000
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Verificar si necesita reconexión
+     */
+    fun needsReconnection(): Boolean {
+        return !hasAnyConnection() && getSecondsSinceLastUpdate() > 5
     }
 }
