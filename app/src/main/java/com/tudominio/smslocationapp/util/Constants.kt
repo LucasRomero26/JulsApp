@@ -2,24 +2,26 @@ package com.tudominio.smslocation.util
 
 /**
  * Global constants for the Juls application.
- * Optimizado para solo UDP con velocidad mejorada.
+ * Optimizado para UDP con 4 servidores para máxima redundancia.
  */
 object Constants {
 
-    // Server Configuration - SOLO UDP
-    const val SERVER_IP_1 = "3.136.116.100" // IP pública del servidor principal
-    const val SERVER_IP_2 = "55.15.55.222" // IP pública del servidor secundario
-    const val UDP_PORT = 6001 // Puerto UDP para comunicación rápida (TCP eliminado)
+    // Server Configuration - 4 SERVIDORES UDP
+    const val SERVER_IP_1 = "18.221.89.18" // IP Lucas
+    const val SERVER_IP_2 = "18.118.103.234"  // IP Nikolas
+    const val SERVER_IP_3 = ""  // IP Alvaro
+    const val SERVER_IP_4 = "18.188.252.1"  // IP Bermejo
+    const val UDP_PORT = 6001 // Puerto UDP para comunicación rápida
 
     // GPS Location Configuration - MÁS RÁPIDO
-    const val LOCATION_UPDATE_INTERVAL = 2000L // 2 segundos (más rápido)
-    const val LOCATION_FASTEST_INTERVAL = 2000L // 2 segundos
-    const val LOCATION_TIMEOUT = 3000L // 3 segundos (reducido)
+    const val LOCATION_UPDATE_INTERVAL = 5000L // 2 segundos (más rápido)
+    const val LOCATION_FASTEST_INTERVAL = 5000L // 2 segundos
+    const val LOCATION_TIMEOUT = 5000L // 3 segundos (reducido)
 
-    // Network Configuration - OPTIMIZADO PARA UDP RÁPIDO
-    const val NETWORK_TIMEOUT = 1500 // 1.5 segundos (más rápido)
-    const val MAX_RETRY_ATTEMPTS = 2 // Menos reintentos para velocidad
-    const val RETRY_DELAY = 500L // 0.5 segundos entre reintentos
+    // Network Configuration - OPTIMIZADO PARA UDP RÁPIDO CON 4 SERVIDORES
+    const val NETWORK_TIMEOUT = 5000 // 1.5 segundos (más rápido)
+    const val MAX_RETRY_ATTEMPTS = 5 // Menos reintentos para velocidad
+    const val RETRY_DELAY = 1000L // 0.5 segundos entre reintentos
 
     // Notification Configuration
     const val NOTIFICATION_CHANNEL_ID = "JulsLocationChannel"
@@ -38,7 +40,7 @@ object Constants {
 
     // Application Messages
     object Messages {
-        const val TRACKING_STARTED = "Location tracking started (UDP only)"
+        const val TRACKING_STARTED = "Location tracking started (UDP - 4 servers)"
         const val TRACKING_STOPPED = "Location tracking stopped"
         const val LOCATION_PERMISSION_REQUIRED = "Location permissions required"
         const val BACKGROUND_PERMISSION_REQUIRED = "Background location permission required"
@@ -78,7 +80,7 @@ object Constants {
     object Logs {
         const val TAG_MAIN = "Juls_Main"
         const val TAG_LOCATION = "Juls_Location"
-        const val TAG_NETWORK = "Juls_Network_UDP" // Especificar UDP
+        const val TAG_NETWORK = "Juls_Network_UDP_4" // Especificar UDP con 4 servidores
         const val TAG_SERVICE = "Juls_Service"
         const val TAG_CONTROLLER = "Juls_Controller"
     }

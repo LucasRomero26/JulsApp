@@ -2,40 +2,39 @@ package com.tudominio.smslocation.model.data
 
 /**
  * Data class representing the global application state.
- * This immutable data class holds all relevant UI and operational states of the application,
- * making it easy to manage and observe changes.
+ * Actualizado para soportar 4 servidores UDP.
  */
 data class AppState(
     // Tracking status
-    val isTrackingEnabled: Boolean = false, // Indicates if location tracking is currently enabled by the user.
-    val isLocationServiceRunning: Boolean = false, // Indicates if the background location service is actively running.
+    val isTrackingEnabled: Boolean = false,
+    val isLocationServiceRunning: Boolean = false,
 
     // Location data
-    val currentLocation: LocationData? = null, // The most recently obtained location data.
-    val lastKnownLocation: LocationData? = null, // The last successfully obtained location, used for display even if current is null.
-    val isLoadingLocation: Boolean = false, // True when the app is actively trying to get a location.
+    val currentLocation: LocationData? = null,
+    val lastKnownLocation: LocationData? = null,
+    val isLoadingLocation: Boolean = false,
 
     // Permission status
-    val hasLocationPermission: Boolean = false, // True if foreground location permission is granted.
-    val hasBackgroundLocationPermission: Boolean = false, // True if background location permission is granted (for Android 10+).
-    val permissionsRequested: Boolean = false, // True if permissions have been requested at least once.
+    val hasLocationPermission: Boolean = false,
+    val hasBackgroundLocationPermission: Boolean = false,
+    val permissionsRequested: Boolean = false,
 
-    // Server status
-    val serverStatus: ServerStatus = ServerStatus(), // Holds detailed status of connections to various servers.
+    // Server status - actualizado para 4 servidores UDP
+    val serverStatus: ServerStatus = ServerStatus(),
 
     // Messages and errors for UI display
-    val statusMessage: String = "", // A general status message to display to the user (e.g., "Tracking started").
-    val errorMessage: String = "", // An error message to display to the user.
-    val isShowingError: Boolean = false, // True if an error message is currently active and should be shown.
+    val statusMessage: String = "",
+    val errorMessage: String = "",
+    val isShowingError: Boolean = false,
 
     // Configuration flags
-    val isFirstLaunch: Boolean = true, // True if this is the very first time the app is launched.
-    val isDebugging: Boolean = false, // True if the app is in debug mode, potentially showing extra info.
+    val isFirstLaunch: Boolean = true,
+    val isDebugging: Boolean = false,
 
     // Statistics
-    val sessionStartTime: Long = 0L, // Timestamp (in milliseconds) when the current tracking session started.
-    val totalLocationsSent: Int = 0, // Count of successful location data transmissions.
-    val sessionDuration: Long = 0L // Stores the total duration of the last completed session.
+    val sessionStartTime: Long = 0L,
+    val totalLocationsSent: Int = 0,
+    val sessionDuration: Long = 0L
 ) {
 
     /**
@@ -68,16 +67,14 @@ data class AppState(
      * Formatted as HH:MM:SS.
      */
     fun getSessionDurationFormatted(): String {
-        if (sessionStartTime == 0L) return "00:00:00" // If session hasn't started, duration is zero.
+        if (sessionStartTime == 0L) return "00:00:00"
 
-        // Calculate duration based on whether tracking is active or stopped.
         val duration = if (isTrackingEnabled) {
-            System.currentTimeMillis() - sessionStartTime // Current session duration.
+            System.currentTimeMillis() - sessionStartTime
         } else {
-            sessionDuration // Duration of the last completed session.
+            sessionDuration
         }
 
-        // Convert milliseconds to hours, minutes, and seconds.
         val hours = duration / 3600000
         val minutes = (duration % 3600000) / 60000
         val seconds = (duration % 60000) / 1000
@@ -87,15 +84,13 @@ data class AppState(
 
     /**
      * Updates the AppState to reflect that tracking has started.
-     * Resets error messages and sets the session start time if not already set.
      */
     fun startTracking(): AppState {
         return copy(
             isTrackingEnabled = true,
             isLocationServiceRunning = true,
-            // Set sessionStartTime only if it's currently 0L (first start of a new session).
             sessionStartTime = if (sessionStartTime == 0L) System.currentTimeMillis() else sessionStartTime,
-            statusMessage = "Location tracking started",
+            statusMessage = "Location tracking started (4 UDP servers)",
             errorMessage = "",
             isShowingError = false
         )
@@ -103,19 +98,18 @@ data class AppState(
 
     /**
      * Updates the AppState to reflect that tracking has stopped.
-     * Calculates and stores the final session duration.
      */
     fun stopTracking(): AppState {
         val finalDuration = if (sessionStartTime > 0L) {
-            System.currentTimeMillis() - sessionStartTime // Calculate final duration.
+            System.currentTimeMillis() - sessionStartTime
         } else {
-            sessionDuration // Use previous duration if session wasn't actively running.
+            sessionDuration
         }
 
         return copy(
             isTrackingEnabled = false,
             isLocationServiceRunning = false,
-            sessionDuration = finalDuration, // Store the calculated duration.
+            sessionDuration = finalDuration,
             statusMessage = "Location tracking stopped",
             errorMessage = "",
             isShowingError = false
@@ -124,22 +118,18 @@ data class AppState(
 
     /**
      * Updates the current location and increments the total locations sent count.
-     * Also updates `lastKnownLocation` to preserve the previous `currentLocation`.
-     * @param location The new [LocationData] received.
      */
     fun updateLocation(location: LocationData): AppState {
         return copy(
             currentLocation = location,
-            lastKnownLocation = currentLocation ?: location, // Keep previous current if new is first.
-            isLoadingLocation = false, // Location has been received, so no longer loading.
-            totalLocationsSent = totalLocationsSent + 1 // Increment counter for sent locations.
+            lastKnownLocation = currentLocation ?: location,
+            isLoadingLocation = false,
+            totalLocationsSent = totalLocationsSent + 1
         )
     }
 
     /**
      * Updates the permission status in the AppState.
-     * @param locationPermission Boolean indicating foreground location permission status.
-     * @param backgroundPermission Boolean indicating background location permission status.
      */
     fun updatePermissions(
         locationPermission: Boolean,
@@ -148,33 +138,29 @@ data class AppState(
         return copy(
             hasLocationPermission = locationPermission,
             hasBackgroundLocationPermission = backgroundPermission,
-            permissionsRequested = true // Mark that permissions have been checked/requested.
+            permissionsRequested = true
         )
     }
 
     /**
      * Sets a success message to be displayed to the user.
-     * Clears any active error messages.
-     * @param message The success message string.
      */
     fun showSuccessMessage(message: String): AppState {
         return copy(
             statusMessage = message,
-            errorMessage = "", // Clear any existing error message.
-            isShowingError = false // Indicate no error is currently active.
+            errorMessage = "",
+            isShowingError = false
         )
     }
 
     /**
      * Sets an error message to be displayed to the user.
-     * Clears any active status messages and sets the error flag.
-     * @param message The error message string.
      */
     fun showErrorMessage(message: String): AppState {
         return copy(
             errorMessage = message,
-            statusMessage = "", // Clear any existing status message.
-            isShowingError = true // Indicate an error is currently active.
+            statusMessage = "",
+            isShowingError = true
         )
     }
 
@@ -191,7 +177,6 @@ data class AppState(
 
     /**
      * Updates the server status in the AppState.
-     * @param newServerStatus The latest [ServerStatus] object.
      */
     fun updateServerStatus(newServerStatus: ServerStatus): AppState {
         return copy(serverStatus = newServerStatus)
@@ -199,22 +184,141 @@ data class AppState(
 
     /**
      * Provides a summary string of the application's current operational status.
-     * This is useful for displaying a concise status to the user.
+     * Actualizado para mostrar estado de 4 servidores UDP.
      */
     fun getStatusSummary(): String {
         return when {
             !hasAllPermissions() -> "Permissions required"
-            isTrackingEnabled -> "Tracking active - ${serverStatus.getActiveConnectionsCount()}/4 servers connected"
+            isTrackingEnabled -> {
+                val activeConnections = serverStatus.getActiveConnectionsCount()
+                val connectivityStatus = when {
+                    activeConnections == 4 -> "Optimal"
+                    activeConnections >= 2 -> "Good"
+                    activeConnections == 1 -> "Limited"
+                    else -> "No connection"
+                }
+                "Tracking active - $connectivityStatus ($activeConnections/4 UDP servers)"
+            }
             hasValidLocation() -> "Ready to track"
-            else -> "Waiting for GPS signal" // Default status if none of the above conditions met.
+            else -> "Waiting for GPS signal"
         }
     }
 
     /**
-     * Checks if the application is in an active operational state,
-     * meaning tracking is enabled, a valid location is available, and there's server connectivity.
+     * Checks if the application is in an active operational state.
+     * Considera 4 servidores UDP.
      */
     fun isActive(): Boolean {
         return isTrackingEnabled && hasValidLocation() && serverStatus.hasAnyConnection()
+    }
+
+    /**
+     * Verifica si hay conectividad óptima (4/4 servidores)
+     */
+    fun hasOptimalConnectivity(): Boolean {
+        return serverStatus.hasAllConnections()
+    }
+
+    /**
+     * Verifica si hay redundancia mínima (2+ servidores)
+     */
+    fun hasMinimumRedundancy(): Boolean {
+        return serverStatus.hasMinimumRedundancy()
+    }
+
+    /**
+     * Obtiene el porcentaje de conectividad
+     */
+    fun getConnectivityPercentage(): Float {
+        return serverStatus.getConnectivityPercentage()
+    }
+
+    /**
+     * Obtiene el estado de redundancia como texto
+     */
+    fun getRedundancyStatusText(): String {
+        val activeConnections = serverStatus.getActiveConnectionsCount()
+        return when {
+            activeConnections == 4 -> "Optimal redundancy (4/4)"
+            activeConnections >= 2 -> "Good redundancy ($activeConnections/4)"
+            activeConnections == 1 -> "Risk: Only 1/4 servers"
+            else -> "Critical: No servers"
+        }
+    }
+
+    /**
+     * Verifica si el estado requiere atención (menos de 2 servidores)
+     */
+    fun requiresAttention(): Boolean {
+        return isTrackingEnabled && serverStatus.getActiveConnectionsCount() < 2
+    }
+
+    /**
+     * Obtiene información detallada del estado de servidores
+     */
+    fun getServerStatusDetails(): Map<String, String> {
+        return mapOf(
+            "server_1_status" to serverStatus.server1UDP.name,
+            "server_2_status" to serverStatus.server2UDP.name,
+            "server_3_status" to serverStatus.server3UDP.name,
+            "server_4_status" to serverStatus.server4UDP.name,
+            "active_connections" to serverStatus.getActiveConnectionsCount().toString(),
+            "total_connections" to "4",
+            "connectivity_percentage" to "${serverStatus.getConnectivityPercentage()}%",
+            "redundancy_status" to getRedundancyStatusText(),
+            "last_update" to if (serverStatus.lastUpdateTime > 0) {
+                java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                    .format(java.util.Date(serverStatus.lastUpdateTime))
+            } else {
+                "Never"
+            }
+        )
+    }
+
+    /**
+     * Calcula la eficiencia de transmisión
+     */
+    fun getTransmissionEfficiency(): Float {
+        val total = serverStatus.totalSentMessages + serverStatus.totalFailedMessages
+        return if (total > 0) {
+            (serverStatus.totalSentMessages.toFloat() / total.toFloat()) * 100f
+        } else {
+            0f
+        }
+    }
+
+    /**
+     * Verifica si el estado es crítico (sin conexiones durante tracking)
+     */
+    fun isCriticalState(): Boolean {
+        return isTrackingEnabled && !serverStatus.hasAnyConnection()
+    }
+
+    /**
+     * Obtiene el tiempo desde la última actualización de servidor
+     */
+    fun getTimeSinceLastServerUpdate(): String {
+        if (serverStatus.lastUpdateTime == 0L) return "Never"
+
+        val timeDiff = System.currentTimeMillis() - serverStatus.lastUpdateTime
+        val seconds = timeDiff / 1000
+
+        return when {
+            seconds < 60 -> "${seconds}s ago"
+            seconds < 3600 -> "${seconds / 60}m ago"
+            else -> "${seconds / 3600}h ago"
+        }
+    }
+
+    /**
+     * Genera un resumen completo del estado para diagnósticos
+     */
+    fun getComprehensiveStatusSummary(): String {
+        val permissions = if (hasAllPermissions()) "✓" else "✗"
+        val gps = if (hasValidLocation()) "✓" else "✗"
+        val servers = "${serverStatus.getActiveConnectionsCount()}/4"
+        val efficiency = String.format("%.1f", getTransmissionEfficiency())
+
+        return "Permissions: $permissions | GPS: $gps | Servers: $servers | Efficiency: $efficiency%"
     }
 }

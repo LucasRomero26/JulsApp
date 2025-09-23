@@ -1,14 +1,14 @@
 package com.tudominio.smslocation.model.data
 
 /**
- * ServerStatus optimizado para solo UDP (2 conexiones en lugar de 4).
- * TCP eliminado completamente.
+ * ServerStatus optimizado para 4 servidores UDP.
+ * TCP eliminado completamente, solo UDP con 4 conexiones.
  */
 data class ServerStatus(
-    val server1TCP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Siempre desconectado (eliminado)
     val server1UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // UDP Server 1
-    val server2TCP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // Siempre desconectado (eliminado)
     val server2UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // UDP Server 2
+    val server3UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // UDP Server 3 (nuevo)
+    val server4UDP: ConnectionStatus = ConnectionStatus.DISCONNECTED, // UDP Server 4 (nuevo)
     val lastUpdateTime: Long = 0L,
     val lastSuccessfulSend: Long = 0L,
     val totalSentMessages: Int = 0,
@@ -27,28 +27,31 @@ data class ServerStatus(
      * Verificar si hay alguna conexión UDP activa
      */
     fun hasAnyConnection(): Boolean {
-        // Solo considerar UDP (TCP siempre será DISCONNECTED)
         return server1UDP == ConnectionStatus.CONNECTED ||
-                server2UDP == ConnectionStatus.CONNECTED
+                server2UDP == ConnectionStatus.CONNECTED ||
+                server3UDP == ConnectionStatus.CONNECTED ||
+                server4UDP == ConnectionStatus.CONNECTED
     }
 
     /**
      * Verificar si todas las conexiones UDP están activas
      */
     fun hasAllConnections(): Boolean {
-        // Solo UDP debe estar conectado (TCP eliminado)
         return server1UDP == ConnectionStatus.CONNECTED &&
-                server2UDP == ConnectionStatus.CONNECTED
+                server2UDP == ConnectionStatus.CONNECTED &&
+                server3UDP == ConnectionStatus.CONNECTED &&
+                server4UDP == ConnectionStatus.CONNECTED
     }
 
     /**
-     * Contar conexiones UDP activas (máximo 2)
+     * Contar conexiones UDP activas (máximo 4)
      */
     fun getActiveConnectionsCount(): Int {
         var count = 0
-        // Solo contar UDP
         if (server1UDP == ConnectionStatus.CONNECTED) count++
         if (server2UDP == ConnectionStatus.CONNECTED) count++
+        if (server3UDP == ConnectionStatus.CONNECTED) count++
+        if (server4UDP == ConnectionStatus.CONNECTED) count++
         return count
     }
 
@@ -76,7 +79,8 @@ data class ServerStatus(
         return when (serverNumber to protocol.uppercase()) {
             1 to "UDP" -> copy(server1UDP = status, lastUpdateTime = System.currentTimeMillis())
             2 to "UDP" -> copy(server2UDP = status, lastUpdateTime = System.currentTimeMillis())
-            // TCP ignorado completamente
+            3 to "UDP" -> copy(server3UDP = status, lastUpdateTime = System.currentTimeMillis())
+            4 to "UDP" -> copy(server4UDP = status, lastUpdateTime = System.currentTimeMillis())
             else -> this
         }
     }
@@ -114,14 +118,14 @@ data class ServerStatus(
     }
 
     /**
-     * Texto de estado general optimizado para UDP
+     * Texto de estado general optimizado para 4 servidores UDP
      */
     fun getOverallStatusText(): String {
         val activeConnections = getActiveConnectionsCount()
         return when (activeConnections) {
-            0 -> "All UDP servers disconnected"
-            2 -> "All UDP servers connected"
-            else -> "$activeConnections of 2 UDP connections active"
+            0 -> "All 4 UDP servers disconnected"
+            4 -> "All 4 UDP servers connected"
+            else -> "$activeConnections of 4 UDP connections active"
         }
     }
 
@@ -135,11 +139,11 @@ data class ServerStatus(
     }
 
     /**
-     * Información detallada UDP
+     * Información detallada UDP para 4 servidores
      */
     fun getUdpStatusDetails(): String {
-        return "UDP Status - Server1: $server1UDP, Server2: $server2UDP, " +
-                "Active: ${getActiveConnectionsCount()}/2, " +
+        return "UDP Status - S1: $server1UDP, S2: $server2UDP, S3: $server3UDP, S4: $server4UDP, " +
+                "Active: ${getActiveConnectionsCount()}/4, " +
                 "Success Rate: ${String.format("%.1f", getSuccessRate())}%"
     }
 
@@ -166,5 +170,32 @@ data class ServerStatus(
      */
     fun needsReconnection(): Boolean {
         return !hasAnyConnection() && getSecondsSinceLastUpdate() > 5
+    }
+
+    /**
+     * Obtener estado de conexión por servidor
+     */
+    fun getServerStatus(serverNumber: Int): ConnectionStatus {
+        return when (serverNumber) {
+            1 -> server1UDP
+            2 -> server2UDP
+            3 -> server3UDP
+            4 -> server4UDP
+            else -> ConnectionStatus.DISCONNECTED
+        }
+    }
+
+    /**
+     * Verificar si hay al menos 2 conexiones activas (redundancia mínima)
+     */
+    fun hasMinimumRedundancy(): Boolean {
+        return getActiveConnectionsCount() >= 2
+    }
+
+    /**
+     * Obtener porcentaje de conectividad
+     */
+    fun getConnectivityPercentage(): Float {
+        return (getActiveConnectionsCount().toFloat() / 4.0f) * 100f
     }
 }

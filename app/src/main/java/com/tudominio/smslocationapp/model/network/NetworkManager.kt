@@ -10,8 +10,8 @@ import com.tudominio.smslocation.util.Constants
 import kotlinx.coroutines.*
 
 /**
- * NetworkManager optimizado para solo UDP con máxima velocidad.
- * Elimina TCP completamente y optimiza UDP.
+ * NetworkManager optimizado para 4 servidores UDP con máxima velocidad.
+ * Elimina TCP completamente y optimiza UDP para 4 conexiones paralelas.
  */
 class NetworkManager(private val context: Context) {
 
@@ -29,8 +29,8 @@ class NetworkManager(private val context: Context) {
     private var currentServerStatus = ServerStatus()
 
     /**
-     * Envío UDP ultra-rápido a ambos servidores.
-     * Solo 2 conexiones UDP en paralelo.
+     * Envío UDP ultra-rápido a los 4 servidores.
+     * 4 conexiones UDP en paralelo para máxima redundancia.
      */
     suspend fun sendLocationToAllServers(locationData: LocationData): ServerStatus {
         if (!isNetworkAvailable()) {
@@ -39,33 +39,45 @@ class NetworkManager(private val context: Context) {
         }
 
         val jsonData = locationData.toJsonFormat()
-        Log.d(TAG, "Fast UDP: Sending location JSON to 2 servers: $jsonData")
+        Log.d(TAG, "Fast UDP: Sending location JSON to 4 servers: $jsonData")
 
         return coroutineScope {
-            // Solo envío UDP - máxima velocidad en paralelo
+            // Envío UDP paralelo a los 4 servidores
             val server1UdpDeferred = async {
                 sendToUdpServer(Constants.SERVER_IP_1, Constants.UDP_PORT, jsonData)
             }
             val server2UdpDeferred = async {
                 sendToUdpServer(Constants.SERVER_IP_2, Constants.UDP_PORT, jsonData)
             }
+            val server3UdpDeferred = async {
+                sendToUdpServer(Constants.SERVER_IP_3, Constants.UDP_PORT, jsonData)
+            }
+            val server4UdpDeferred = async {
+                sendToUdpServer(Constants.SERVER_IP_4, Constants.UDP_PORT, jsonData)
+            }
 
-            // Esperar resultados UDP
+            // Esperar resultados UDP de los 4 servidores
             val server1UdpResult = server1UdpDeferred.await()
             val server2UdpResult = server2UdpDeferred.await()
+            val server3UdpResult = server3UdpDeferred.await()
+            val server4UdpResult = server4UdpDeferred.await()
 
-            // Crear estado con TCP siempre desconectado
+            // Crear estado con los 4 servidores UDP
             val newStatus = currentServerStatus.copy(
-                server1TCP = ServerStatus.ConnectionStatus.DISCONNECTED, // TCP eliminado
                 server1UDP = server1UdpResult,
-                server2TCP = ServerStatus.ConnectionStatus.DISCONNECTED, // TCP eliminado
                 server2UDP = server2UdpResult,
+                server3UDP = server3UdpResult,
+                server4UDP = server4UdpResult,
                 lastUpdateTime = System.currentTimeMillis()
             )
 
-            // Contar éxitos UDP únicamente
-            val successCount = listOf(server1UdpResult, server2UdpResult)
-                .count { it == ServerStatus.ConnectionStatus.CONNECTED }
+            // Contar éxitos UDP
+            val successCount = listOf(
+                server1UdpResult,
+                server2UdpResult,
+                server3UdpResult,
+                server4UdpResult
+            ).count { it == ServerStatus.ConnectionStatus.CONNECTED }
 
             val finalStatus = if (successCount > 0) {
                 newStatus.incrementSuccessfulSend()
@@ -73,7 +85,8 @@ class NetworkManager(private val context: Context) {
                 newStatus.incrementFailedSend()
             }
 
-            Log.d(TAG, "Fast UDP: Results - S1: $server1UdpResult, S2: $server2UdpResult ($successCount/2 success)")
+            Log.d(TAG, "Fast UDP: Results - S1: $server1UdpResult, S2: $server2UdpResult, " +
+                    "S3: $server3UdpResult, S4: $server4UdpResult ($successCount/4 success)")
 
             updateServerStatus(finalStatus)
             finalStatus
@@ -112,10 +125,10 @@ class NetworkManager(private val context: Context) {
     }
 
     /**
-     * Test de conectividad solo UDP
+     * Test de conectividad para los 4 servidores UDP
      */
     suspend fun testAllServerConnections(): ServerStatus = coroutineScope {
-        Log.d(TAG, "Testing UDP connections to both servers...")
+        Log.d(TAG, "Testing UDP connections to all 4 servers...")
 
         val server1UdpDeferred = async {
             udpClient.testConnection(Constants.SERVER_IP_1, Constants.UDP_PORT)
@@ -123,19 +136,28 @@ class NetworkManager(private val context: Context) {
         val server2UdpDeferred = async {
             udpClient.testConnection(Constants.SERVER_IP_2, Constants.UDP_PORT)
         }
+        val server3UdpDeferred = async {
+            udpClient.testConnection(Constants.SERVER_IP_3, Constants.UDP_PORT)
+        }
+        val server4UdpDeferred = async {
+            udpClient.testConnection(Constants.SERVER_IP_4, Constants.UDP_PORT)
+        }
 
         val server1UdpOk = server1UdpDeferred.await()
         val server2UdpOk = server2UdpDeferred.await()
+        val server3UdpOk = server3UdpDeferred.await()
+        val server4UdpOk = server4UdpDeferred.await()
 
         val newStatus = currentServerStatus.copy(
-            server1TCP = ServerStatus.ConnectionStatus.DISCONNECTED, // TCP siempre desconectado
             server1UDP = if (server1UdpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
-            server2TCP = ServerStatus.ConnectionStatus.DISCONNECTED, // TCP siempre desconectado
             server2UDP = if (server2UdpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
+            server3UDP = if (server3UdpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
+            server4UDP = if (server4UdpOk) ServerStatus.ConnectionStatus.CONNECTED else ServerStatus.ConnectionStatus.DISCONNECTED,
             lastUpdateTime = System.currentTimeMillis()
         )
 
-        Log.d(TAG, "UDP connection test results: S1-UDP:$server1UdpOk, S2-UDP:$server2UdpOk")
+        Log.d(TAG, "UDP connection test results: S1-UDP:$server1UdpOk, S2-UDP:$server2UdpOk, " +
+                "S3-UDP:$server3UdpOk, S4-UDP:$server4UdpOk")
 
         updateServerStatus(newStatus)
         newStatus
@@ -189,7 +211,7 @@ class NetworkManager(private val context: Context) {
     fun resetServerStatistics() {
         currentServerStatus = currentServerStatus.resetCounters()
         onServerStatusChanged?.invoke(currentServerStatus)
-        Log.d(TAG, "UDP server statistics reset")
+        Log.d(TAG, "UDP server statistics reset for 4 servers")
     }
 
     /**
@@ -203,9 +225,9 @@ class NetworkManager(private val context: Context) {
             val capabilities = connectivityManager.getNetworkCapabilities(network)
 
             when {
-                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "WiFi (UDP optimized)"
-                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile Data (UDP optimized)"
-                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet (UDP optimized)"
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "WiFi (UDP optimized - 4 servers)"
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Mobile Data (UDP optimized - 4 servers)"
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet (UDP optimized - 4 servers)"
                 else -> "No Connection"
             }
 
@@ -221,11 +243,11 @@ class NetworkManager(private val context: Context) {
     fun cleanup() {
         networkScope.cancel()
         onServerStatusChanged = null
-        Log.d(TAG, "NetworkManager (UDP only) cleaned up")
+        Log.d(TAG, "NetworkManager (UDP only - 4 servers) cleaned up")
     }
 
     /**
-     * Envío de datos de test UDP
+     * Envío de datos de test UDP a los 4 servidores
      */
     suspend fun sendTestData(): ServerStatus {
         val testLocation = LocationData.createTestLocation(
@@ -233,7 +255,31 @@ class NetworkManager(private val context: Context) {
             lon = -74.123456
         )
 
-        Log.d(TAG, "Sending test UDP data to both servers: ${testLocation.toJsonFormat()}")
+        Log.d(TAG, "Sending test UDP data to all 4 servers: ${testLocation.toJsonFormat()}")
         return sendLocationToAllServers(testLocation)
+    }
+
+    /**
+     * Verificar si hay redundancia suficiente (al menos 2 servidores activos)
+     */
+    fun hasMinimumRedundancy(): Boolean {
+        return currentServerStatus.hasMinimumRedundancy()
+    }
+
+    /**
+     * Obtener estadísticas detalladas de los 4 servidores
+     */
+    fun getDetailedServerStats(): Map<String, Any> {
+        return mapOf(
+            "server_1_status" to currentServerStatus.server1UDP.name,
+            "server_2_status" to currentServerStatus.server2UDP.name,
+            "server_3_status" to currentServerStatus.server3UDP.name,
+            "server_4_status" to currentServerStatus.server4UDP.name,
+            "active_connections" to currentServerStatus.getActiveConnectionsCount(),
+            "max_connections" to 4,
+            "connectivity_percentage" to currentServerStatus.getConnectivityPercentage(),
+            "has_minimum_redundancy" to hasMinimumRedundancy(),
+            "is_optimal_state" to currentServerStatus.isOptimalState()
+        )
     }
 }

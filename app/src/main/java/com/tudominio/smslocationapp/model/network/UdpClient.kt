@@ -10,20 +10,24 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketTimeoutException
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * UDP client optimizado para máxima velocidad.
- * Configurado con timeouts reducidos y optimizaciones de buffer.
+ * UDP client mejorado con gestión de recursos y monitoreo de salud
  */
 class UdpClient {
 
     companion object {
         private const val TAG = Constants.Logs.TAG_NETWORK
         private const val MAX_UDP_PACKET_SIZE = 1024
-        // Timeout optimizado para UDP ultra-rápido
-        private const val FAST_UDP_TIMEOUT = 1000L // 1 segundo para máxima velocidad
-        private const val SOCKET_TIMEOUT = 800 // 0.8 segundos para socket
+        private const val FAST_UDP_TIMEOUT = 2000L // Incrementado a 2 segundos
+        private const val SOCKET_TIMEOUT = 1500 // 1.5 segundos
     }
+
+    // Contadores para monitoreo
+    private val successCount = AtomicInteger(0)
+    private val failureCount = AtomicInteger(0)
+    private val timeoutCount = AtomicInteger(0)
 
     sealed class UdpResult {
         object Success : UdpResult()
@@ -31,46 +35,46 @@ class UdpClient {
         object Timeout : UdpResult()
     }
 
-    /**
-     * Envío UDP ultra-rápido con timeouts optimizados
-     */
     suspend fun sendData(
         serverIP: String,
         port: Int = Constants.UDP_PORT,
         data: String
     ): UdpResult = withContext(Dispatchers.IO) {
 
-        Log.d(TAG, "Fast UDP: Sending to $serverIP:$port - Size: ${data.length} chars")
+        Log.d(TAG, "UDP Send to $serverIP:$port - Size: ${data.length} chars")
 
         try {
             val dataBytes = data.toByteArray(Charsets.UTF_8)
             if (dataBytes.size > MAX_UDP_PACKET_SIZE) {
-                Log.w(TAG, "UDP: Data size (${dataBytes.size}) exceeds max packet size ($MAX_UDP_PACKET_SIZE)")
+                Log.w(TAG, "Data size (${dataBytes.size}) exceeds max packet size")
+                failureCount.incrementAndGet()
                 return@withContext UdpResult.Error("Data too large for UDP packet")
             }
 
-            // Timeout ultra-reducido para máxima velocidad
+            // Validar IP antes de enviar
+            if (!isValidIPAddress(serverIP)) {
+                Log.w(TAG, "Invalid IP address: $serverIP")
+                failureCount.incrementAndGet()
+                return@withContext UdpResult.Error("Invalid IP address")
+            }
+
             val result = withTimeoutOrNull(FAST_UDP_TIMEOUT) {
-                performFastUdpSend(serverIP, port, dataBytes)
+                performUdpSend(serverIP, port, dataBytes)
             }
 
             return@withContext result ?: UdpResult.Timeout.also {
-                Log.w(TAG, "Fast UDP: Timeout sending to $serverIP:$port after ${FAST_UDP_TIMEOUT}ms")
+                timeoutCount.incrementAndGet()
+                Log.w(TAG, "UDP Timeout to $serverIP:$port after ${FAST_UDP_TIMEOUT}ms")
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Fast UDP: Error sending to $serverIP:$port", e)
-            return@withContext UdpResult.Error(
-                message = "UDP Error: ${e.message}",
-                exception = e
-            )
+            failureCount.incrementAndGet()
+            Log.e(TAG, "UDP Error to $serverIP:$port", e)
+            return@withContext UdpResult.Error("UDP Error: ${e.message}", e)
         }
     }
 
-    /**
-     * Implementación UDP optimizada para velocidad máxima
-     */
-    private suspend fun performFastUdpSend(
+    private suspend fun performUdpSend(
         serverIP: String,
         port: Int,
         dataBytes: ByteArray
@@ -79,71 +83,94 @@ class UdpClient {
         var socket: DatagramSocket? = null
 
         try {
+            // Crear socket con configuración optimizada
             socket = DatagramSocket().apply {
-                // Configuración optimizada para velocidad
                 soTimeout = SOCKET_TIMEOUT
-                sendBufferSize = 16384 // Buffer más grande para mejor rendimiento
+                sendBufferSize = 16384
                 receiveBufferSize = 8192
-                reuseAddress = true // Reusar dirección para velocidad
-                trafficClass = 0x10 // IPTOS_LOWDELAY para baja latencia
+                reuseAddress = true
+                trafficClass = 0x10 // IPTOS_LOWDELAY
+
+                // Configuraciones adicionales para estabilidad
+                try {
+                    // DatagramSocket no soporta keepAlive como TCP
+                    // Configurar otros parámetros UDP específicos si es necesario
+                } catch (e: Exception) {
+                    Log.d(TAG, "Error setting socket options: ${e.message}")
+                }
             }
 
             val address = InetAddress.getByName(serverIP)
             val packet = DatagramPacket(dataBytes, dataBytes.size, address, port)
 
-            // Envío directo sin verificaciones adicionales para máxima velocidad
+            // Envío con monitoreo de tiempo
+            val startTime = System.currentTimeMillis()
             socket.send(packet)
+            val endTime = System.currentTimeMillis()
 
-            Log.d(TAG, "Fast UDP: SUCCESS to $serverIP:$port (${dataBytes.size} bytes)")
+            successCount.incrementAndGet()
+            Log.d(TAG, "UDP SUCCESS to $serverIP:$port (${dataBytes.size} bytes, ${endTime - startTime}ms)")
+
             return@withContext UdpResult.Success
 
         } catch (e: SocketTimeoutException) {
-            Log.w(TAG, "Fast UDP: Timeout for $serverIP:$port", e)
+            timeoutCount.incrementAndGet()
+            Log.w(TAG, "UDP Socket timeout for $serverIP:$port")
             return@withContext UdpResult.Timeout
 
         } catch (e: IOException) {
-            Log.e(TAG, "Fast UDP: IO error for $serverIP:$port", e)
+            failureCount.incrementAndGet()
+            Log.e(TAG, "UDP IO error for $serverIP:$port", e)
             return@withContext UdpResult.Error("UDP IO Error: ${e.message}", e)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Fast UDP: Unexpected error for $serverIP:$port", e)
+            failureCount.incrementAndGet()
+            Log.e(TAG, "UDP Unexpected error for $serverIP:$port", e)
             return@withContext UdpResult.Error("UDP Error: ${e.message}", e)
 
         } finally {
+            // Cerrar socket de manera segura
             try {
                 socket?.close()
             } catch (e: Exception) {
-                Log.w(TAG, "Fast UDP: Error closing socket", e)
+                Log.w(TAG, "Error closing UDP socket", e)
             }
         }
     }
 
-    /**
-     * Test de conexión UDP rápido
-     */
     suspend fun testConnection(
         serverIP: String,
         port: Int = Constants.UDP_PORT
     ): Boolean = withContext(Dispatchers.IO) {
 
         try {
-            withTimeoutOrNull(800L) { // Test ultra-rápido
-                InetAddress.getByName(serverIP)
-                DatagramSocket().use { socket ->
-                    socket.soTimeout = 500
+            if (!isValidIPAddress(serverIP)) {
+                Log.w(TAG, "Invalid IP for connection test: $serverIP")
+                return@withContext false
+            }
+
+            withTimeoutOrNull(1500L) { // Test rápido
+                var socket: DatagramSocket? = null
+                try {
+                    socket = DatagramSocket()
+                    socket.soTimeout = 1000
+
+                    // Verificar que podemos resolver la dirección
+                    InetAddress.getByName(serverIP)
+
+                    Log.d(TAG, "UDP connection test passed for $serverIP:$port")
                     true
+                } finally {
+                    socket?.close()
                 }
             } ?: false
 
         } catch (e: Exception) {
-            Log.d(TAG, "Fast UDP: Test connection failed for $serverIP:$port - ${e.message}")
+            Log.d(TAG, "UDP connection test failed for $serverIP:$port - ${e.message}")
             false
         }
     }
 
-    /**
-     * Envío con reintentos optimizado para velocidad
-     */
     suspend fun sendDataWithRetry(
         serverIP: String,
         port: Int = Constants.UDP_PORT,
@@ -151,43 +178,56 @@ class UdpClient {
         maxRetries: Int = Constants.MAX_RETRY_ATTEMPTS
     ): UdpResult {
 
+        var lastResult: UdpResult? = null
+
         repeat(maxRetries) { attempt ->
             val result = sendData(serverIP, port, data)
 
             if (result is UdpResult.Success) {
                 if (attempt > 0) {
-                    Log.d(TAG, "Fast UDP: Success on retry $attempt for $serverIP:$port")
+                    Log.d(TAG, "UDP Success on retry $attempt for $serverIP:$port")
                 }
                 return result
             }
 
-            // Delay ultra-corto entre reintentos para velocidad máxima
+            lastResult = result
+
+            // Delay progresivo entre reintentos
             if (attempt < maxRetries - 1) {
-                Log.d(TAG, "Fast UDP: Retry $attempt failed for $serverIP:$port, retrying in ${Constants.RETRY_DELAY}ms...")
-                kotlinx.coroutines.delay(Constants.RETRY_DELAY)
+                val delay = Constants.RETRY_DELAY * (attempt + 1)
+                Log.d(TAG, "UDP Retry $attempt failed for $serverIP:$port, retrying in ${delay}ms")
+                kotlinx.coroutines.delay(delay)
             }
         }
 
-        Log.w(TAG, "Fast UDP: All $maxRetries attempts failed for $serverIP:$port")
-        return UdpResult.Error("Failed after $maxRetries fast attempts")
+        Log.w(TAG, "UDP All $maxRetries attempts failed for $serverIP:$port")
+        return lastResult ?: UdpResult.Error("All retry attempts failed")
     }
 
-    /**
-     * Envío múltiple optimizado
-     */
     suspend fun sendMultiplePackets(
         serverIP: String,
         port: Int = Constants.UDP_PORT,
         dataList: List<String>
     ): List<UdpResult> = withContext(Dispatchers.IO) {
-        dataList.map { data ->
-            sendData(serverIP, port, data)
+
+        if (dataList.isEmpty()) {
+            return@withContext emptyList()
+        }
+
+        Log.d(TAG, "Sending ${dataList.size} UDP packets to $serverIP:$port")
+
+        dataList.mapIndexed { index, data ->
+            val result = sendData(serverIP, port, data)
+
+            // Pequeño delay entre paquetes para evitar saturación
+            if (index < dataList.size - 1) {
+                kotlinx.coroutines.delay(50)
+            }
+
+            result
         }
     }
 
-    /**
-     * Envío con confirmación (opcional, pero rápido)
-     */
     suspend fun sendDataWithConfirmation(
         serverIP: String,
         port: Int = Constants.UDP_PORT,
@@ -201,26 +241,70 @@ class UdpClient {
             return@withContext Pair(sendResult, null)
         }
 
+        var socket: DatagramSocket? = null
         try {
-            DatagramSocket().use { socket ->
-                socket.soTimeout = 800 // Timeout corto para confirmación rápida
-                val buffer = ByteArray(256) // Buffer pequeño para respuesta rápida
-                val packet = DatagramPacket(buffer, buffer.size)
-
-                socket.receive(packet)
-                val response = String(packet.data, 0, packet.length, Charsets.UTF_8)
-
-                Log.d(TAG, "Fast UDP: Received confirmation from $serverIP:$port - $response")
-                return@withContext Pair(sendResult, response)
+            socket = DatagramSocket().apply {
+                soTimeout = 1000 // Timeout corto para confirmación
             }
 
+            val buffer = ByteArray(256)
+            val packet = DatagramPacket(buffer, buffer.size)
+
+            socket.receive(packet)
+            val response = String(packet.data, 0, packet.length, Charsets.UTF_8)
+
+            Log.d(TAG, "UDP Confirmation received from $serverIP:$port - $response")
+            return@withContext Pair(sendResult, response)
+
         } catch (e: SocketTimeoutException) {
-            Log.d(TAG, "Fast UDP: No confirmation received from $serverIP:$port (timeout)")
+            Log.d(TAG, "UDP No confirmation from $serverIP:$port (timeout)")
             return@withContext Pair(sendResult, null)
 
         } catch (e: Exception) {
-            Log.w(TAG, "Fast UDP: Error receiving confirmation from $serverIP:$port", e)
+            Log.w(TAG, "UDP Error receiving confirmation from $serverIP:$port", e)
             return@withContext Pair(sendResult, null)
+
+        } finally {
+            socket?.close()
+        }
+    }
+
+    private fun isValidIPAddress(ip: String): Boolean {
+        return try {
+            val parts = ip.split(".")
+            if (parts.size != 4) return false
+
+            parts.all { part ->
+                val num = part.toIntOrNull()
+                num != null && num in 0..255
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun getStatistics(): Map<String, Int> {
+        return mapOf(
+            "success_count" to successCount.get(),
+            "failure_count" to failureCount.get(),
+            "timeout_count" to timeoutCount.get(),
+            "total_attempts" to (successCount.get() + failureCount.get() + timeoutCount.get())
+        )
+    }
+
+    fun resetStatistics() {
+        successCount.set(0)
+        failureCount.set(0)
+        timeoutCount.set(0)
+        Log.d(TAG, "UDP statistics reset")
+    }
+
+    fun getSuccessRate(): Float {
+        val total = successCount.get() + failureCount.get() + timeoutCount.get()
+        return if (total > 0) {
+            (successCount.get().toFloat() / total.toFloat()) * 100f
+        } else {
+            0f
         }
     }
 }

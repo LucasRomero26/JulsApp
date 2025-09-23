@@ -45,7 +45,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Main Screen optimizada para solo UDP con velocidad mejorada
+ * Main Screen optimizada para 4 servidores UDP con velocidad mejorada
  */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -117,6 +117,8 @@ fun MainScreen(
                         LocationStatusCard(appState = appState)
                         Spacer(modifier = Modifier.height(16.dp))
                         ServerStatusCard(appState = appState)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        RedundancyStatusCard(appState = appState)
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                 }
@@ -304,9 +306,9 @@ private fun ModernHeaderSection(
             ),
             color = MaterialTheme.colorScheme.primary
         )
-        // Indicador UDP
+        // CAMBIO: Actualizado para 4 servidores
         Text(
-            text = "Ultra-Fast UDP Protocol",
+            text = "Ultra-Fast UDP Protocol - 4 Servers",
             style = MaterialTheme.typography.bodySmall.copy(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp
@@ -402,14 +404,15 @@ private fun ModernPermissionsStatus(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
+                    // CAMBIO: Texto actualizado para 4 servidores
                     Text(
-                        text = if (allPermissionsGranted) "Ready for UDP Tracking" else "Permissions Required",
+                        text = if (allPermissionsGranted) "Ready for 4-Server UDP Tracking" else "Permissions Required",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = contentColor
                     )
                     Text(
                         text = when {
-                            allPermissionsGranted -> "All permissions granted - UDP ready"
+                            allPermissionsGranted -> "All permissions granted - 4 UDP servers ready"
                             !hasLocationPermission -> "Basic location access needed"
                             !hasBackgroundLocationPermission -> "Background location access needed"
                             else -> "Location permissions required"
@@ -510,8 +513,9 @@ private fun ModernPermissionsStatus(
                                         style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
+                                    // CAMBIO: Texto actualizado para 4 servidores
                                     Text(
-                                        text = "For continuous UDP tracking, please select \"Allow all the time\" in the next screen.",
+                                        text = "For continuous UDP tracking to 4 servers, please select \"Allow all the time\" in the next screen.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -532,6 +536,7 @@ private fun MainTrackingButton(
     onToggleTracking: () -> Unit
 ) {
     val buttonColor = if (isTracking) MaterialTheme.colorScheme.error else LightBlueGray
+    // CAMBIO: Texto del botón actualizado para 4 servidores
     val buttonText = if (isTracking) "Stop UDP Tracking" else "Start UDP Tracking"
     val buttonIcon = if (isTracking) Icons.Default.Stop else Icons.Default.PlayArrow
 
@@ -674,13 +679,14 @@ private fun LocationStatusCard(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
+                    // CAMBIO: Texto actualizado para 4 servidores
                     Text(
-                        text = "UDP GPS Tracking Active",
+                        text = "4-Server UDP GPS Tracking Active",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        text = "Sending location every 2 seconds via UDP", // ACTUALIZADO
+                        text = "Sending location every 2 seconds via UDP to 4 servers",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
@@ -767,19 +773,21 @@ private fun ServerStatusCard(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
+                    // CAMBIO: Título actualizado para 4 servidores
                     Text(
-                        text = "UDP Server Status",
+                        text = "4-Server UDP Status",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Text(
-                        text = "Fast UDP transmission status", // ACTUALIZADO
+                        text = "Fast UDP transmission to 4 servers",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
                     )
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))
+            // CAMBIO: Agregados Server 3 y Server 4
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ServerConnectionRow(
                     serverName = "Server 1",
@@ -789,6 +797,129 @@ private fun ServerStatusCard(
                     serverName = "Server 2",
                     udpStatus = appState.serverStatus.server2UDP
                 )
+                ServerConnectionRow(
+                    serverName = "Server 3",
+                    udpStatus = appState.serverStatus.server3UDP
+                )
+                ServerConnectionRow(
+                    serverName = "Server 4",
+                    udpStatus = appState.serverStatus.server4UDP
+                )
+            }
+        }
+    }
+}
+
+// NUEVO: Tarjeta de estado de redundancia
+@Composable
+private fun RedundancyStatusCard(
+    appState: AppState
+) {
+    val activeConnections = appState.serverStatus.getActiveConnectionsCount()
+    val connectivityPercentage = appState.serverStatus.getConnectivityPercentage()
+
+    val statusColor = when {
+        activeConnections == 4 -> LightBlueGray
+        activeConnections >= 2 -> MaterialTheme.colorScheme.primary
+        activeConnections == 1 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
+    }
+
+    val statusText = when {
+        activeConnections == 4 -> "Optimal Redundancy"
+        activeConnections >= 2 -> "Good Redundancy"
+        activeConnections == 1 -> "Limited Redundancy"
+        else -> "No Redundancy"
+    }
+
+    val statusIcon = when {
+        activeConnections == 4 -> Icons.Default.SecurityUpdateGood
+        activeConnections >= 2 -> Icons.Default.Security
+        activeConnections == 1 -> Icons.Default.SecurityUpdateWarning
+        else -> Icons.Default.Error
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = statusColor.copy(alpha = 0.1f)
+        ),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = statusColor,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = Lightest
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = statusColor
+                    )
+                    Text(
+                        text = "$activeConnections of 4 servers connected (${String.format("%.0f", connectivityPercentage)}%)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = statusColor.copy(alpha = 0.8f)
+                    )
+                }
+
+                // Indicador visual de conectividad
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "$activeConnections/4",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = statusColor
+                    )
+                }
+            }
+
+            if (activeConnections < 4) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = statusColor.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (activeConnections < 2) Icons.Default.Warning else Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (activeConnections < 2) MaterialTheme.colorScheme.error else statusColor
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = when {
+                            activeConnections < 2 -> "Critical: Risk of data loss if remaining server fails"
+                            activeConnections == 2 -> "Acceptable: Minimum redundancy maintained"
+                            activeConnections == 3 -> "Good: One server offline, redundancy maintained"
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (activeConnections < 2) MaterialTheme.colorScheme.error else statusColor.copy(alpha = 0.8f)
+                    )
+                }
             }
         }
     }
@@ -813,7 +944,8 @@ private fun ServerConnectionRow(
         // Solo mostrar UDP
         ConnectionIndicator(
             label = "UDP",
-            isConnected = udpStatus == com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.CONNECTED
+            isConnected = udpStatus == com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.CONNECTED,
+            status = udpStatus
         )
     }
 }
@@ -821,10 +953,24 @@ private fun ServerConnectionRow(
 @Composable
 private fun ConnectionIndicator(
     label: String,
-    isConnected: Boolean
+    isConnected: Boolean,
+    status: com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus
 ) {
     val successColor = LightBlueGray
     val errorColor = MaterialTheme.colorScheme.error
+    val warningColor = MaterialTheme.colorScheme.tertiary
+
+    val (indicatorColor, statusText) = when (status) {
+        com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.CONNECTED ->
+            successColor to "Connected"
+        com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.CONNECTING ->
+            warningColor to "Connecting"
+        com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.TIMEOUT ->
+            warningColor to "Timeout"
+        com.tudominio.smslocation.model.data.ServerStatus.ConnectionStatus.ERROR ->
+            errorColor to "Error"
+        else -> errorColor to "Disconnected"
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -834,14 +980,21 @@ private fun ConnectionIndicator(
             modifier = Modifier
                 .size(8.dp)
                 .background(
-                    color = if (isConnected) successColor else errorColor,
+                    color = indicatorColor,
                     shape = CircleShape
                 )
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isConnected) successColor else errorColor
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = indicatorColor
+            )
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.labelSmall,
+                color = indicatorColor.copy(alpha = 0.7f)
+            )
+        }
     }
 }
