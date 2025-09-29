@@ -7,10 +7,10 @@ package com.tudominio.smslocation.util
 object Constants {
 
     // Server Configuration - 4 SERVIDORES UDP
-    const val SERVER_IP_1 = "18.221.89.18" // IP Lucas
-    const val SERVER_IP_2 = "18.118.103.234"  // IP Nikolas
-    const val SERVER_IP_3 = ""  // IP Alvaro
-    const val SERVER_IP_4 = "18.188.252.1"  // IP Bermejo
+    const val SERVER_IP_1 = "18.221.89.184" // IP Lucas
+    const val SERVER_IP_2 = "52.205.242.29"  // IP Nikolas
+    const val SERVER_IP_3 = "3.139.58.179"  // IP Alvaro
+    const val SERVER_IP_4 = "18.118.103.234"  // IP Bermejo
     const val UDP_PORT = 6001 // Puerto UDP para comunicación rápida
 
     // GPS Location Configuration - MÁS RÁPIDO
