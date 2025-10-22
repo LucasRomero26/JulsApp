@@ -11,11 +11,13 @@ import com.google.android.gms.location.*
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.tudominio.smslocation.model.data.LocationData
 import com.tudominio.smslocation.util.Constants
+import com.tudominio.smslocation.util.DeviceUtils
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Repository ultra-simple - NO acumula memoria, solo obtiene y pasa ubicaciones
+ * Updated to support device identification for multiple devices
  */
 class SimpleLocationRepository(private val context: Context) {
 
@@ -62,7 +64,13 @@ class SimpleLocationRepository(private val context: Context) {
                     cancellationTokenSource.token
                 ).await()
 
-                location?.let { LocationData.fromAndroidLocation(it) }
+                location?.let {
+                    LocationData.fromAndroidLocation(
+                        it,
+                        deviceId = DeviceUtils.getDeviceId(context),
+                        deviceName = DeviceUtils.getDeviceName(context)
+                    )
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting location", e)
@@ -82,7 +90,11 @@ class SimpleLocationRepository(private val context: Context) {
             locationCallback = object : LocationCallback() {
                 override fun onLocationResult(locationResult: LocationResult) {
                     locationResult.lastLocation?.let { location ->
-                        val locationData = LocationData.fromAndroidLocation(location)
+                        val locationData = LocationData.fromAndroidLocation(
+                            location,
+                            deviceId = DeviceUtils.getDeviceId(context),
+                            deviceName = DeviceUtils.getDeviceName(context)
+                        )
                         if (locationData.isValid()) {
                             // Llamar inmediatamente sin acumular
                             onLocation(locationData)
@@ -97,7 +109,7 @@ class SimpleLocationRepository(private val context: Context) {
                 Looper.getMainLooper()
             )
 
-            Log.d(TAG, "Simple location updates started")
+            Log.d(TAG, "Simple location updates started for device: ${DeviceUtils.getDeviceId(context)}")
             true
 
         } catch (e: Exception) {
@@ -120,5 +132,18 @@ class SimpleLocationRepository(private val context: Context) {
 
     fun cleanup() {
         stopLocationUpdates()
+    }
+
+    /**
+     * Gets device information for debugging purposes
+     */
+    fun getDeviceInfo(): String {
+        return buildString {
+            appendLine("=== Device Information ===")
+            appendLine("Device ID: ${DeviceUtils.getDeviceId(context)}")
+            appendLine("Device Name: ${DeviceUtils.getDeviceName(context)}")
+            appendLine("Android Version: ${DeviceUtils.getAndroidVersion()}")
+            appendLine("Full Device Name: ${DeviceUtils.getDeviceFullName()}")
+        }
     }
 }

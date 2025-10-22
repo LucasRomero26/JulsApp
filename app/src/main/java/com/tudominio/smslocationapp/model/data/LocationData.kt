@@ -5,7 +5,7 @@ import com.tudominio.smslocation.util.Constants
 
 /**
  * Data class representing GPS location data.
- * Updated to correctly use the GPS timestamp.
+ * Updated to correctly use the GPS timestamp and support device identification.
  */
 data class LocationData(
     val latitude: Double,
@@ -15,7 +15,11 @@ data class LocationData(
     val accuracy: Float? = null, // Estimated horizontal accuracy of this location, in meters.
     val altitude: Double? = null, // Altitude in meters above the WGS84 ellipsoid.
     val speed: Float? = null,    // Speed if it is available, in meters/second over ground.
-    val provider: String? = null // The name of the provider that generated this fix (e.g., "gps", "network").
+    val provider: String? = null, // The name of the provider that generated this fix (e.g., "gps", "network").
+    // New fields for device identification
+    val deviceId: String,
+    val deviceName: String? = null,
+    val deviceType: String = "mobile"
 ) {
 
     companion object {
@@ -23,7 +27,7 @@ data class LocationData(
          * Creates a [LocationData] object from an Android [Location] object.
          * Prioritizes the GPS timestamp over the system timestamp for the `timestamp` field.
          */
-        fun fromAndroidLocation(location: Location): LocationData {
+        fun fromAndroidLocation(location: Location, deviceId: String, deviceName: String? = null): LocationData {
             // Use the GPS time if available and valid, otherwise fallback to current system time.
             val gpsTimestamp = if (location.time > 0) location.time else System.currentTimeMillis()
             val systemTimestamp = System.currentTimeMillis() // Capture current system time for context.
@@ -36,7 +40,9 @@ data class LocationData(
                 accuracy = if (location.hasAccuracy()) location.accuracy else null,
                 altitude = if (location.hasAltitude()) location.altitude else null,
                 speed = if (location.hasSpeed()) location.speed else null,
-                provider = location.provider
+                provider = location.provider,
+                deviceId = deviceId,
+                deviceName = deviceName
             )
         }
 
@@ -44,12 +50,14 @@ data class LocationData(
          * Creates an empty [LocationData] object, typically used for initialization
          * or when no valid location is available yet.
          */
-        fun empty(): LocationData {
+        fun empty(deviceId: String = "unknown", deviceName: String? = null): LocationData {
             return LocationData(
                 latitude = 0.0,
                 longitude = 0.0,
                 timestamp = 0L,
-                systemTimestamp = 0L
+                systemTimestamp = 0L,
+                deviceId = deviceId,
+                deviceName = deviceName
             )
         }
 
@@ -61,7 +69,9 @@ data class LocationData(
          */
         fun createTestLocation(
             lat: Double = 4.123456, // Default test latitude
-            lon: Double = -74.123456 // Default test longitude
+            lon: Double = -74.123456, // Default test longitude
+            deviceId: String = "test_device",
+            deviceName: String? = "Test Device"
         ): LocationData {
             val currentTime = System.currentTimeMillis()
             return LocationData(
@@ -72,18 +82,25 @@ data class LocationData(
                 accuracy = 5.0f, // Sample accuracy in meters
                 altitude = 2640.0, // Sample altitude in meters
                 speed = 0.0f, // Sample speed in m/s
-                provider = "gps" // Sample provider name
+                provider = "gps", // Sample provider name
+                deviceId = deviceId,
+                deviceName = deviceName
             )
         }
     }
 
     /**
      * Converts the [LocationData] object to a compact JSON string format for server transmission.
-     * Format optimized for minimal size: {"lat":4.123456,"lon":-74.123456,"time":1692123456789,"acc":5.0}
+     * Format optimized for minimal size: {"device_id":"abc123","lat":4.123456,"lon":-74.123456,"time":1692123456789,"acc":5.0}
      */
     fun toJsonFormat(): String {
         val jsonBuilder = StringBuilder()
         jsonBuilder.append("{")
+        jsonBuilder.append("\"device_id\":\"$deviceId\",")
+        deviceName?.let {
+            jsonBuilder.append("\"device_name\":\"$it\",")
+        }
+        jsonBuilder.append("\"device_type\":\"$deviceType\",")
         jsonBuilder.append("\"lat\":$latitude,")
         jsonBuilder.append("\"lon\":$longitude,")
         jsonBuilder.append("\"time\":$timestamp")  // Use GPS timestamp as the primary time key.
@@ -113,6 +130,11 @@ data class LocationData(
     fun toJsonFormatExtended(): String {
         val jsonBuilder = StringBuilder()
         jsonBuilder.append("{\n")
+        jsonBuilder.append("  \"device_id\": \"$deviceId\",\n")
+        deviceName?.let {
+            jsonBuilder.append("  \"device_name\": \"$it\",\n")
+        }
+        jsonBuilder.append("  \"device_type\": \"$deviceType\",\n")
         jsonBuilder.append("  \"latitude\": $latitude,\n")
         jsonBuilder.append("  \"longitude\": $longitude,\n")
         jsonBuilder.append("  \"gps_timestamp\": $timestamp,\n") // Explicitly named GPS timestamp.
@@ -159,7 +181,8 @@ data class LocationData(
                 timestamp > 0 && // Ensure timestamp is positive.
                 latitude >= -90.0 && latitude <= 90.0 && // Latitude must be within valid range.
                 longitude >= -180.0 && longitude <= 180.0 && // Longitude must be within valid range.
-                isTimestampReasonable() // Check if timestamp is plausible.
+                isTimestampReasonable() && // Check if timestamp is plausible.
+                deviceId.isNotBlank() // Ensure device ID is not empty
     }
 
     /**
@@ -278,6 +301,9 @@ data class LocationData(
     fun getDebugInfo(): String {
         return buildString {
             appendLine("=== Location Debug Info ===")
+            appendLine("Device ID: $deviceId")
+            appendLine("Device Name: ${deviceName ?: "Unknown"}")
+            appendLine("Device Type: $deviceType")
             appendLine("Coordinates: ${getFormattedCoordinatesWithAccuracy()}")
             appendLine("GPS Time: ${getFormattedGpsTimestamp()} ($timestamp)")
             appendLine("System Time: ${getFormattedSystemTimestamp()} ($systemTimestamp)")
