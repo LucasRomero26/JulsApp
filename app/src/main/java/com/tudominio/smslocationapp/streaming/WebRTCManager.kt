@@ -129,19 +129,49 @@ class WebRTCManager(private val context: Context) {
         Log.d(TAG, "Video capture started: ${Constants.VIDEO_WIDTH}x${Constants.VIDEO_HEIGHT} @ ${Constants.VIDEO_FPS}fps")
     }
 
+    // ✅ MÉTODO ACTUALIZADO CON HTTPS Y OPCIONES
     private fun connectToSignalingServer() {
         try {
-            val serverUrl = "http://${Constants.SERVER_IP_1}:3001"
+            // ✅ CAMBIO: Usar HTTPS en lugar de HTTP
+            val serverUrl = "https://${Constants.SERVER_IP_1}"
             Log.d(TAG, "Connecting to signaling server: $serverUrl")
 
-            socket = IO.socket(serverUrl)
+            // ✅ CAMBIO: Agregar opciones de configuración para Socket.IO
+            val options = IO.Options().apply {
+                // Habilitar transporte WebSocket y polling
+                transports = arrayOf("websocket", "polling")
+
+                // Configuración de reconexión
+                reconnection = true
+                reconnectionAttempts = 5
+                reconnectionDelay = 1000
+                reconnectionDelayMax = 5000
+
+                // Timeout más largo para conexiones lentas
+                timeout = 20000
+
+                // Forzar nuevo manager para evitar problemas de caché
+                forceNew = true
+
+                // Path correcto de Socket.IO
+                path = "/socket.io/"
+
+                // ✅ Habilitar SSL/TLS para HTTPS
+                secure = true
+            }
+
+            // ✅ CAMBIO: Crear socket con opciones
+            socket = IO.socket(serverUrl, options)
 
             setupSocketListeners()
-
             socket?.connect()
+
+            Log.d(TAG, "Socket.IO configured with secure WebSocket (wss://)")
 
         } catch (e: URISyntaxException) {
             Log.e(TAG, "Invalid server URL", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error connecting to signaling server", e)
         }
     }
 
@@ -154,6 +184,7 @@ class WebRTCManager(private val context: Context) {
                 put("deviceId", deviceId)
                 put("deviceName", deviceName)
             }
+
             socket?.emit("register-broadcaster", registerData)
         }
 
