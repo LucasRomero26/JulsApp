@@ -13,11 +13,12 @@ import androidx.core.app.NotificationCompat
 import com.tudominio.smslocation.MainActivity
 import com.tudominio.smslocation.R
 import com.tudominio.smslocation.controller.LocationController
+import com.tudominio.smslocation.streaming.WebRTCManager
 import com.tudominio.smslocation.util.Constants
 import kotlinx.coroutines.*
 
 /**
- * Servicio ultra-simple - SOLO mantiene el rastreo activo
+ * Servicio que maneja tracking GPS y streaming de video
  */
 class LocationService : Service() {
 
@@ -28,19 +29,29 @@ class LocationService : Service() {
     }
 
     private var locationController: LocationController? = null
+    private var webRTCManager: WebRTCManager? = null // ✨ NUEVO
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    private var isVideoStreaming = false // ✨ NUEVO
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Simple LocationService created")
+        Log.d(TAG, "LocationService created with video support")
 
         createNotificationChannel()
         locationController = LocationController(this)
 
+        // ✨ NUEVO: Inicializar WebRTC Manager
+        if (Constants.WEBRTC_ENABLED) {
+            webRTCManager = WebRTCManager(this)
+        }
+
         // Observar estado SOLO para actualizar notificación
         serviceScope.launch {
             locationController?.appState?.collect { appState ->
-                updateNotification(appState.currentLocation?.getFormattedCoordinates() ?: "Waiting...")
+                val locationText = appState.currentLocation?.getFormattedCoordinates() ?: "Waiting..."
+                val videoStatus = if (isVideoStreaming) "📹 Streaming" else "📹 Off"
+                updateNotification("$locationText | $videoStatus")
             }
         }
     }
@@ -55,13 +66,33 @@ class LocationService : Service() {
                 serviceScope.launch {
                     try {
                         locationController?.startLocationTracking()
+
+                        // ✨ NUEVO: Iniciar video automáticamente si está habilitado
+                        if (Constants.WEBRTC_ENABLED) {
+                            delay(2000) // Esperar 2 segundos después del GPS
+                            startVideoStreaming()
+                        }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error starting tracking", e)
                         stopSelf()
                     }
                 }
             }
+
+            // ✨ NUEVO: Iniciar solo video
+            Constants.ServiceActions.START_VIDEO -> {
+                serviceScope.launch {
+                    startVideoStreaming()
+                }
+            }
+
+            // ✨ NUEVO: Detener solo video
+            Constants.ServiceActions.STOP_VIDEO -> {
+                stopVideoStreaming()
+            }
+
             Constants.ServiceActions.STOP_TRACKING -> {
+                stopVideoStreaming() // ✨ Detener video primero
                 locationController?.stopLocationTracking()
                 stopSelf()
             }
@@ -74,17 +105,52 @@ class LocationService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Simple service destroyed")
+        Log.d(TAG, "Service destroyed")
 
+        stopVideoStreaming() // ✨ Limpiar video
         locationController?.cleanup()
         serviceScope.cancel()
+    }
+
+    // ✨ NUEVO: Método para iniciar streaming de video
+    private fun startVideoStreaming() {
+        if (isVideoStreaming) {
+            Log.w(TAG, "Video streaming already active")
+            return
+        }
+
+        try {
+            Log.d(TAG, "Starting video streaming...")
+            webRTCManager?.initialize()
+            isVideoStreaming = true
+            Log.d(TAG, "✅ Video streaming started")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error starting video streaming", e)
+            isVideoStreaming = false
+        }
+    }
+
+    // ✨ NUEVO: Método para detener streaming de video
+    private fun stopVideoStreaming() {
+        if (!isVideoStreaming) {
+            return
+        }
+
+        try {
+            Log.d(TAG, "Stopping video streaming...")
+            webRTCManager?.cleanup()
+            isVideoStreaming = false
+            Log.d(TAG, "Video streaming stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping video streaming", e)
+        }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Juls Simple Tracking",
+                "Juls Tracking + Video", // ✨ Actualizado
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 setSound(null, null)
@@ -112,7 +178,7 @@ class LocationService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Juls Simple Tracking")
+            .setContentTitle("Juls Tracking + Video") // ✨ Actualizado
             .setContentText(content)
             .setSmallIcon(R.drawable.logo_dark)
             .setContentIntent(pendingIntent)
