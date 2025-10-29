@@ -8,9 +8,9 @@ object Constants {
 
     // Server Configuration - 4 SERVIDORES UDP
     const val SERVER_IP_1 = "julstracker.app" // IP Lucas
-    const val SERVER_IP_2 = "34.228.139.116"  // IP Nikolas
-    const val SERVER_IP_3 = "3.138.76.110"  // IP Alvaro
-    const val SERVER_IP_4 = "3.150.240.255"  //  IP Bermejo
+    const val SERVER_IP_2 = "julstracker.online"  // IP Nikolas
+    const val SERVER_IP_3 = "alvaromugno.online"  // IP Alvaro
+    const val SERVER_IP_4 = "electronicdesign.app"  //  IP Bermejo
     const val UDP_PORT = 6001 // Puerto UDP para comunicación rápida
 
     // GPS Location Configuration - MÁS RÁPIDO
